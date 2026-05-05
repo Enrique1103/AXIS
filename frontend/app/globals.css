@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* ── CSS variables (used in inline styles) ── */
+:root {
+  --background: #020817;
+  --foreground: #e2e8f0;
+  --nav-bg:     rgba(2, 8, 23, 0.92);
+  --nav-border: rgba(51, 65, 85, 0.35);
+  --sticky-bg:  #020817;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image:
+    radial-gradient(ellipse at 15% 40%, rgba(52, 211, 153, 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 15%, rgba(34, 211, 238, 0.05) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 90%, rgba(251,146,60,0.04) 0%, transparent 45%);
+  background-attachment: fixed;
+}
+
+* { box-sizing: border-box; }
+
+/* ── Glassmorphic card ── */
+.gc {
+  background: rgba(22, 34, 62, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.glow-em {
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.18), 0 0 4px rgba(52, 211, 153, 0.12);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #34d399, #22d3ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Animations ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.anim-up { animation: fadeInUp 0.4s ease-out both; }
+.anim-in { animation: fadeIn  0.3s ease-out both; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(51,65,85,0.6); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(51,65,85,0.9); }
+
+
+/* ════════════════════════════════════════════
+   L I G H T   T H E M E
+   ════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  --background: #e8edf4;
+  --foreground: #0f172a;
+  --nav-bg:     rgba(240, 244, 250, 0.94);
+  --nav-border: rgba(148, 163, 184, 0.45);
+  --sticky-bg:  #e8edf4;
+  color-scheme: light;
+}
+
+[data-theme="light"] body {
+  background-color: #e8edf4;
+  color: #0f172a;
+  background-image:
+    radial-gradient(ellipse at 20% 30%, rgba(52, 211, 153, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(251, 146, 60, 0.08) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 100%, rgba(34, 211, 238, 0.06) 0%, transparent 40%);
+}
+
+/* ── Glassmorphic card ── */
+[data-theme="light"] .gc {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.45) !important;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.10), 0 1px 3px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+/* ── Backgrounds ── */
+[data-theme="light"] .bg-zinc-950  { background-color: #e8edf4 !important; }
+[data-theme="light"] .bg-zinc-900  { background-color: #f5f7fa !important; }
+[data-theme="light"] .bg-zinc-800  { background-color: #dde3ec !important; }
+[data-theme="light"] .bg-zinc-700  { background-color: #c8d2df !important; }
+[data-theme="light"] .min-h-screen { background-color: #e8edf4 !important; }
+
+/* Opacity variants */
+[data-theme="light"] .bg-zinc-800\/60  { background-color: rgba(226,232,240,0.65) !important; }
+[data-theme="light"] .bg-zinc-800\/50  { background-color: rgba(226,232,240,0.55) !important; }
+[data-theme="light"] .bg-zinc-800\/40  { background-color: rgba(226,232,240,0.45) !important; }
+[data-theme="light"] .bg-zinc-900\/20  { background-color: rgba(241,245,249,0.4)  !important; }
+[data-theme="light"] .bg-zinc-900\/60  { background-color: rgba(241,245,249,0.75) !important; }
+[data-theme="light"] .bg-slate-900\/60 { background-color: rgba(241,245,249,0.75) !important; }
+[data-theme="light"] .bg-slate-800\/80 { background-color: rgba(226,232,240,0.9)  !important; }
+[data-theme="light"] .bg-slate-800\/70 { background-color: rgba(226,232,240,0.8)  !important; }
+[data-theme="light"] .bg-green-500\/5  { background-color: rgba(34,197,94,0.06)   !important; }
+
+/* ── Text ── */
+[data-theme="light"] .text-zinc-100 { color: #0f172a !important; }
+[data-theme="light"] .text-zinc-200 { color: #1e293b !important; }
+[data-theme="light"] .text-zinc-300 { color: #334155 !important; }
+[data-theme="light"] .text-zinc-400 { color: #475569 !important; }
+[data-theme="light"] .text-zinc-500 { color: #64748b !important; }
+[data-theme="light"] .text-zinc-600 { color: #94a3b8 !important; }
+[data-theme="light"] .text-zinc-700 { color: #94a3b8 !important; }
+
+/* ── Borders ── */
+[data-theme="light"] .border-zinc-800     { border-color: #e2e8f0 !important; }
+[data-theme="light"] .border-zinc-800\/60 { border-color: rgba(203,213,225,0.6) !important; }
+[data-theme="light"] .border-zinc-700     { border-color: #cbd5e1 !important; }
+[data-theme="light"] .border-slate-700\/40 { border-color: rgba(148,163,184,0.4)  !important; }
+[data-theme="light"] .border-slate-700\/25 { border-color: rgba(148,163,184,0.25) !important; }
+[data-theme="light"] .border-green-500\/40 { border-color: rgba(34,197,94,0.4)    !important; }
+[data-theme="light"] .border-dashed        { border-color: #cbd5e1 !important; }
+
+/* ── Table sticky columns ── */
+[data-theme="light"] td.sticky,
+[data-theme="light"] th.sticky { background-color: #f0f4f8 !important; }
+
+/* ── Inputs ── */
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="time"] {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* ── Quote colors (amber-200/80 and amber-500/55 are invisible on light bg) ── */
+[data-theme="light"] .text-amber-200\/80 { color: rgba(120, 80, 0, 0.85) !important; }
+[data-theme="light"] .text-amber-500\/55 { color: rgba(146, 90, 0, 0.75) !important; }
+
+/* ── Scrollbar ── */
+[data-theme="light"] ::-webkit-scrollbar-thumb       { background: rgba(148,163,184,0.55); }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.7); }
