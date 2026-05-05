@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from database import get_db
 from models import RecordToggle, RecordSet
 from datetime import date as date_type, timedelta
@@ -59,16 +59,19 @@ def get_month_all(year: int, month: int):
 @router.post("/set")
 def set_record(body: RecordSet):
     """Establece el estado de un record. completed=None borra el registro."""
-    db = get_db()
-    if body.completed is None:
-        db.table("records").delete().eq("date", body.date).eq("habit_id", body.habit_id).execute()
-        return {"completed": None}
-    db.table("records").upsert({
-        "date": body.date,
-        "habit_id": body.habit_id,
-        "completed": body.completed,
-    }, on_conflict="habit_id,date").execute()
-    return {"completed": body.completed}
+    try:
+        db = get_db()
+        if body.completed is None:
+            db.table("records").delete().eq("date", body.date).eq("habit_id", body.habit_id).execute()
+            return {"completed": None}
+        db.table("records").upsert({
+            "date": body.date,
+            "habit_id": body.habit_id,
+            "completed": body.completed,
+        }, on_conflict="habit_id,date").execute()
+        return {"completed": body.completed}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/toggle")
