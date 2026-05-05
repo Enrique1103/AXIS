@@ -67,7 +67,7 @@ def set_record(body: RecordSet):
         "date": body.date,
         "habit_id": body.habit_id,
         "completed": body.completed,
-    }).execute()
+    }, on_conflict="habit_id,date").execute()
     return {"completed": body.completed}
 
 
