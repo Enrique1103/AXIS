@@ -59,19 +59,20 @@ def get_month_all(year: int, month: int):
 @router.post("/set")
 def set_record(body: RecordSet):
     """Establece el estado de un record. completed=None borra el registro."""
-    try:
-        db = get_db()
-        if body.completed is None:
-            db.table("records").delete().eq("date", body.date).eq("habit_id", body.habit_id).execute()
-            return {"completed": None}
-        db.table("records").upsert({
+    db = get_db()
+    if body.completed is None:
+        db.table("records").delete().eq("date", body.date).eq("habit_id", body.habit_id).execute()
+        return {"completed": None}
+    existing = db.table("records").select("id").eq("date", body.date).eq("habit_id", body.habit_id).execute()
+    if existing.data:
+        db.table("records").update({"completed": body.completed}).eq("id", existing.data[0]["id"]).execute()
+    else:
+        db.table("records").insert({
             "date": body.date,
             "habit_id": body.habit_id,
             "completed": body.completed,
-        }, on_conflict="habit_id,date").execute()
-        return {"completed": body.completed}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        }).execute()
+    return {"completed": body.completed}
 
 
 @router.post("/toggle")
