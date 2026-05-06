@@ -29,14 +29,14 @@ export default function TopNav() {
     const { quoteCount } = getSettings()
     const q = getDailyQuotes(quoteCount)
     if (q.length > 0) setQuote(q[0])
-    const saved = (localStorage.getItem("axis-theme") ?? "dark") as "dark" | "light"
+    const saved = (localStorage.getItem("fenix-theme") ?? "dark") as "dark" | "light"
     setTheme(saved)
   }, [])
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark"
     setTheme(next)
-    localStorage.setItem("axis-theme", next)
+    localStorage.setItem("fenix-theme", next)
     document.documentElement.setAttribute("data-theme", next)
   }
 
@@ -108,14 +108,14 @@ export default function TopNav() {
       {/* ── Row 2: medallion + quote ── */}
       <div className="flex items-center gap-4 px-3 h-20">
 
-        {/* AXIS medallion */}
+        {/* FÉNIX medallion */}
         <div className="w-16 h-16 rounded-full overflow-hidden shrink-0"
           style={{
             boxShadow: "0 0 24px rgba(251,146,60,0.55), 0 0 8px rgba(251,146,60,0.3), inset 0 0 0 1px rgba(251,146,60,0.15)",
           }}>
           <Image
-            src="/axis-icon.png"
-            alt="AXIS"
+            src="/fenix-icon.png"
+            alt="FÉNIX"
             width={64}
             height={64}
             quality={100}

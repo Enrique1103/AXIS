@@ -1,8 +1,8 @@
 import { QUOTES, Quote } from "./quotes"
 
-const KEY_HABIT_TIME  = "axis_habit_time"
-const KEY_QUOTE_TIME  = "axis_quote_time"
-const KEY_QUOTE_COUNT = "axis_quote_count"
+const KEY_HABIT_TIME  = "fenix_habit_time"
+const KEY_QUOTE_TIME  = "fenix_quote_time"
+const KEY_QUOTE_COUNT = "fenix_quote_count"
 
 export interface QuoteSettings {
   habitTime:  string
