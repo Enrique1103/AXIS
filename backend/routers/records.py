@@ -10,7 +10,7 @@ router = APIRouter(prefix="/records", tags=["records"])
 @router.get("/day/{date}")
 def get_day(date: str, user_id: str = Depends(get_user_id)):
     db = get_db()
-    res = db.table("record").select("habit_id, completed").eq("date", date).eq("user_id", user_id).execute()
+    res = db.table("records").select("habit_id, completed").eq("date", date).eq("user_id", user_id).execute()
     return {r["habit_id"]: r["completed"] for r in res.data}
 
 
@@ -18,7 +18,7 @@ def get_day(date: str, user_id: str = Depends(get_user_id)):
 def get_month(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
-    res = (db.table("record")
+    res = (db.table("records")
            .select("date, completed")
            .like("date", f"{prefix}%")
            .eq("completed", True)
@@ -34,7 +34,7 @@ def get_month(year: int, month: int, user_id: str = Depends(get_user_id)):
 def get_month_by_habit(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
-    res = (db.table("record")
+    res = (db.table("records")
            .select("habit_id, completed")
            .like("date", f"{prefix}%")
            .eq("completed", True)
@@ -51,7 +51,7 @@ def get_month_by_habit(year: int, month: int, user_id: str = Depends(get_user_id
 def get_month_all(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
-    res = (db.table("record")
+    res = (db.table("records")
            .select("date, habit_id, completed")
            .like("date", f"{prefix}%")
            .eq("user_id", user_id)
@@ -63,13 +63,13 @@ def get_month_all(year: int, month: int, user_id: str = Depends(get_user_id)):
 def set_record(body: RecordSet, user_id: str = Depends(get_user_id)):
     db = get_db()
     if body.completed is None:
-        db.table("record").delete().eq("date", body.date).eq("habit_id", body.habit_id).eq("user_id", user_id).execute()
+        db.table("records").delete().eq("date", body.date).eq("habit_id", body.habit_id).eq("user_id", user_id).execute()
         return {"completed": None}
-    existing = db.table("record").select("id").eq("date", body.date).eq("habit_id", body.habit_id).eq("user_id", user_id).execute()
+    existing = db.table("records").select("id").eq("date", body.date).eq("habit_id", body.habit_id).eq("user_id", user_id).execute()
     if existing.data:
-        db.table("record").update({"completed": body.completed}).eq("id", existing.data[0]["id"]).execute()
+        db.table("records").update({"completed": body.completed}).eq("id", existing.data[0]["id"]).execute()
     else:
-        db.table("record").insert({
+        db.table("records").insert({
             "date": body.date,
             "habit_id": body.habit_id,
             "completed": body.completed,
@@ -81,7 +81,7 @@ def set_record(body: RecordSet, user_id: str = Depends(get_user_id)):
 @router.post("/toggle")
 def toggle(body: RecordToggle, user_id: str = Depends(get_user_id)):
     db = get_db()
-    res = (db.table("record")
+    res = (db.table("records")
            .select("id, completed")
            .eq("date", body.date)
            .eq("habit_id", body.habit_id)
@@ -89,10 +89,10 @@ def toggle(body: RecordToggle, user_id: str = Depends(get_user_id)):
            .execute())
     if res.data:
         new_state = not res.data[0]["completed"]
-        db.table("record").update({"completed": new_state}).eq("id", res.data[0]["id"]).execute()
+        db.table("records").update({"completed": new_state}).eq("id", res.data[0]["id"]).execute()
     else:
         new_state = True
-        db.table("record").insert({
+        db.table("records").insert({
             "date": body.date,
             "habit_id": body.habit_id,
             "completed": True,
@@ -118,7 +118,7 @@ def weekly_trend(user_id: str = Depends(get_user_id)):
     if habit_count == 0:
         return []
 
-    first_res = (db.table("record").select("date").eq("user_id", user_id).order("date").limit(1).execute())
+    first_res = (db.table("records").select("date").eq("user_id", user_id).order("date").limit(1).execute())
     if not first_res.data:
         return []
 
@@ -127,7 +127,7 @@ def weekly_trend(user_id: str = Depends(get_user_id)):
     today = date_type.today()
     current_monday = today - timedelta(days=today.weekday())
 
-    res = (db.table("record")
+    res = (db.table("records")
            .select("date, completed")
            .eq("user_id", user_id)
            .gte("date", str(first_monday))
@@ -163,7 +163,7 @@ def weekday_avg(months: int = 3, user_id: str = Depends(get_user_id)):
     today = date_type.today()
     range_start = today - timedelta(days=months * 30)
 
-    res = (db.table("record")
+    res = (db.table("records")
            .select("date, completed")
            .eq("user_id", user_id)
            .gte("date", str(range_start))
@@ -193,10 +193,10 @@ def weekday_avg(months: int = 3, user_id: str = Depends(get_user_id)):
 def reset_month(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
-    db.table("record").delete().like("date", f"{prefix}%").eq("user_id", user_id).execute()
+    db.table("records").delete().like("date", f"{prefix}%").eq("user_id", user_id).execute()
 
 
 @router.delete("/all", status_code=204)
 def reset_all(user_id: str = Depends(get_user_id)):
     db = get_db()
-    db.table("record").delete().eq("user_id", user_id).execute()
+    db.table("records").delete().eq("user_id", user_id).execute()
