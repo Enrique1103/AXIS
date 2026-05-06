@@ -36,10 +36,18 @@ export default function LoginPage() {
     setError("")
     setSuccess("")
 
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      setError(`Variables de entorno no cargadas (URL: ${url ? "ok" : "FALTA"}, KEY: ${key ? "ok" : "FALTA"})`)
+      setLoading(false)
+      return
+    }
+
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
-        setError("Correo o contraseña incorrectos")
+        setError(error.message)
         setLoading(false)
       } else {
         router.push("/")
@@ -48,7 +56,7 @@ export default function LoginPage() {
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) {
-        setError(error.message)
+        setError(`Error: ${error.message}`)
         setLoading(false)
       } else {
         setSuccess("Cuenta creada. Revisa tu correo para confirmarla.")
