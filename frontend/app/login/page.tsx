@@ -22,24 +22,45 @@ const FLAMES = [
 ]
 
 export default function LoginPage() {
+  const [mode, setMode]         = useState<"login" | "signup">("login")
   const [email, setEmail]       = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState("")
+  const [success, setSuccess]   = useState("")
   const router = useRouter()
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError("")
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError("Correo o contraseña incorrectos")
-      setLoading(false)
+    setSuccess("")
+
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError("Correo o contraseña incorrectos")
+        setLoading(false)
+      } else {
+        router.push("/")
+        router.refresh()
+      }
     } else {
-      router.push("/")
-      router.refresh()
+      const { error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else {
+        setSuccess("Cuenta creada. Revisa tu correo para confirmarla.")
+        setLoading(false)
+      }
     }
+  }
+
+  function toggleMode() {
+    setMode(m => m === "login" ? "signup" : "login")
+    setError("")
+    setSuccess("")
   }
 
   return (
@@ -148,7 +169,7 @@ export default function LoginPage() {
         </p>
 
         {/* ── Form ── */}
-        <form onSubmit={handleLogin}
+        <form onSubmit={handleSubmit}
           className="w-full max-w-sm mt-10 space-y-4"
           style={{ animation: "formEmerge 0.7s ease-out 3.5s both" }}>
 
@@ -175,9 +196,8 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-red-400 text-xs text-center">{error}</p>
-          )}
+          {error   && <p className="text-red-400 text-xs text-center">{error}</p>}
+          {success && <p className="text-green-400 text-xs text-center">{success}</p>}
 
           <button type="submit" disabled={loading}
             className="w-full py-3.5 rounded-2xl font-bold text-sm tracking-widest transition-all
@@ -189,8 +209,19 @@ export default function LoginPage() {
               color: "#fff",
               boxShadow: loading ? "none" : "0 0 24px rgba(249,115,22,0.35)",
             }}>
-            {loading ? "Resurgiendo…" : "Resurgir"}
+            {loading
+              ? (mode === "login" ? "Resurgiendo…" : "Creando cuenta…")
+              : (mode === "login" ? "Resurgir" : "Crear cuenta")}
           </button>
+
+          <p className="text-center text-xs text-zinc-500">
+            {mode === "login" ? "¿Aún no tienes cuenta?" : "¿Ya tienes cuenta?"}
+            {" "}
+            <button type="button" onClick={toggleMode}
+              className="text-amber-400 hover:text-amber-300 transition-colors font-medium">
+              {mode === "login" ? "Crear cuenta" : "Iniciar sesión"}
+            </button>
+          </p>
         </form>
       </div>
     </>
