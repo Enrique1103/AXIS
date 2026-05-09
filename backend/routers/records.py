@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from database import get_db
-from models import RecordToggle, RecordSet
+from models import RecordSet
 from auth import get_user_id
 from datetime import date as date_type, timedelta
 
@@ -10,8 +10,8 @@ router = APIRouter(prefix="/records", tags=["records"])
 @router.get("/day/{date}")
 def get_day(date: str, user_id: str = Depends(get_user_id)):
     db = get_db()
-    res = db.table("records").select("habit_id, completed").eq("date", date).eq("user_id", user_id).execute()
-    return {r["habit_id"]: r["completed"] for r in res.data}
+    res = db.table("records").select("habit_id, state").eq("date", date).eq("user_id", user_id).execute()
+    return {r["habit_id"]: r["state"] for r in res.data}
 
 
 @router.get("/month/{year}/{month}")
@@ -19,9 +19,9 @@ def get_month(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
     res = (db.table("records")
-           .select("date, completed")
+           .select("date")
            .like("date", f"{prefix}%")
-           .eq("completed", True)
+           .eq("state", "done")
            .eq("user_id", user_id)
            .execute())
     summary: dict[str, int] = {}
@@ -35,9 +35,9 @@ def get_month_by_habit(year: int, month: int, user_id: str = Depends(get_user_id
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
     res = (db.table("records")
-           .select("habit_id, completed")
+           .select("habit_id")
            .like("date", f"{prefix}%")
-           .eq("completed", True)
+           .eq("state", "done")
            .eq("user_id", user_id)
            .execute())
     stats: dict[int, int] = {}
@@ -52,7 +52,7 @@ def get_month_all(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     prefix = f"{year:04d}-{month:02d}-"
     res = (db.table("records")
-           .select("date, habit_id, completed")
+           .select("date, habit_id, state")
            .like("date", f"{prefix}%")
            .eq("user_id", user_id)
            .execute())
@@ -62,43 +62,20 @@ def get_month_all(year: int, month: int, user_id: str = Depends(get_user_id)):
 @router.post("/set")
 def set_record(body: RecordSet, user_id: str = Depends(get_user_id)):
     db = get_db()
-    if body.completed is None:
+    if body.state is None:
         db.table("records").delete().eq("date", body.date).eq("habit_id", body.habit_id).eq("user_id", user_id).execute()
-        return {"completed": None}
+        return {"state": None}
     existing = db.table("records").select("id").eq("date", body.date).eq("habit_id", body.habit_id).eq("user_id", user_id).execute()
     if existing.data:
-        db.table("records").update({"completed": body.completed}).eq("id", existing.data[0]["id"]).execute()
+        db.table("records").update({"state": body.state}).eq("id", existing.data[0]["id"]).execute()
     else:
         db.table("records").insert({
             "date": body.date,
             "habit_id": body.habit_id,
-            "completed": body.completed,
+            "state": body.state,
             "user_id": user_id,
         }).execute()
-    return {"completed": body.completed}
-
-
-@router.post("/toggle")
-def toggle(body: RecordToggle, user_id: str = Depends(get_user_id)):
-    db = get_db()
-    res = (db.table("records")
-           .select("id, completed")
-           .eq("date", body.date)
-           .eq("habit_id", body.habit_id)
-           .eq("user_id", user_id)
-           .execute())
-    if res.data:
-        new_state = not res.data[0]["completed"]
-        db.table("records").update({"completed": new_state}).eq("id", res.data[0]["id"]).execute()
-    else:
-        new_state = True
-        db.table("records").insert({
-            "date": body.date,
-            "habit_id": body.habit_id,
-            "completed": True,
-            "user_id": user_id,
-        }).execute()
-    return {"completed": new_state}
+    return {"state": body.state}
 
 
 def _week_label(ws: date_type) -> str:
@@ -128,24 +105,28 @@ def weekly_trend(user_id: str = Depends(get_user_id)):
     current_monday = today - timedelta(days=today.weekday())
 
     res = (db.table("records")
-           .select("date, completed")
+           .select("date, state")
            .eq("user_id", user_id)
            .gte("date", str(first_monday))
            .lte("date", str(today))
            .execute())
 
-    completed_by_date: dict[str, int] = {}
+    done_by_date: dict[str, int] = {}
+    rest_by_date: dict[str, int] = {}
     for r in res.data:
-        if r["completed"]:
-            completed_by_date[r["date"]] = completed_by_date.get(r["date"], 0) + 1
+        if r["state"] == "done":
+            done_by_date[r["date"]] = done_by_date.get(r["date"], 0) + 1
+        elif r["state"] == "rest":
+            rest_by_date[r["date"]] = rest_by_date.get(r["date"], 0) + 1
 
     result = []
     ws = first_monday
     while ws <= current_monday:
         days = [str(ws + timedelta(days=j)) for j in range(7) if (ws + timedelta(days=j)) <= today]
-        completed = sum(completed_by_date.get(d, 0) for d in days)
-        total = len(days) * habit_count
-        pct = round(completed / total * 100, 1) if total else 0
+        done = sum(done_by_date.get(d, 0) for d in days)
+        rest = sum(rest_by_date.get(d, 0) for d in days)
+        total = len(days) * habit_count - rest
+        pct = round(done / total * 100, 1) if total else 0
         result.append({"week_start": str(ws), "label": _week_label(ws), "pct": pct})
         ws += timedelta(weeks=1)
 
@@ -164,27 +145,31 @@ def weekday_avg(months: int = 3, user_id: str = Depends(get_user_id)):
     range_start = today - timedelta(days=months * 30)
 
     res = (db.table("records")
-           .select("date, completed")
+           .select("date, state")
            .eq("user_id", user_id)
            .gte("date", str(range_start))
            .lte("date", str(today))
            .execute())
 
     wd_done  = [0] * 7
+    wd_rest  = [0] * 7
     wd_total = [0] * 7
     seen_dates: set[str] = set()
 
     for r in res.data:
         d = r["date"]
         wd = date_type.fromisoformat(d).weekday()
-        if r["completed"]:
+        if r["state"] == "done":
             wd_done[wd] += 1
+        elif r["state"] == "rest":
+            wd_rest[wd] += 1
         if d not in seen_dates:
             wd_total[wd] += habit_count
             seen_dates.add(d)
 
     return {
-        str(wd): round(wd_done[wd] / wd_total[wd] * 100, 1) if wd_total[wd] else 0
+        str(wd): round(wd_done[wd] / (wd_total[wd] - wd_rest[wd]) * 100, 1)
+        if (wd_total[wd] - wd_rest[wd]) > 0 else 0
         for wd in range(7)
     }
 

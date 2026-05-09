@@ -8,8 +8,10 @@ export interface Habit {
   created_at: string
 }
 
+export type HabitState = 'done' | 'rest' | 'failed'
+
 export interface DayRecords {
-  [habitId: number]: boolean
+  [habitId: number]: HabitState
 }
 
 export interface MonthSummary {

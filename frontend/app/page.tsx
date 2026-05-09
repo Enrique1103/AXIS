@@ -8,7 +8,7 @@ import { MONTHS, DAYS_SHORT, daysInMonth, firstWeekdayOffset, toISODate, streak 
 import { HabitCell } from "@/components/habit-cell"
 import { MonthlyEKGChart } from "@/components/monthly-ekg-chart"
 
-type RecordMatrix = Record<string, Record<number, boolean>>
+type RecordMatrix = Record<string, Record<number, string>>
 
 function getWeeks(year: number, month: number): (number | null)[][] {
   const days = daysInMonth(year, month)
@@ -30,7 +30,7 @@ function dateStr(year: number, month: number, day: number) {
 // ── Weekly view ──────────────────────────────────────────────────────────────
 
 function WeeklyView({
-  weeks, habits, matrix, year, month, todayStr, onComplete, onNotComplete,
+  weeks, habits, matrix, year, month, todayStr, onCycle,
 }: {
   weeks: (number | null)[][]
   habits: Habit[]
@@ -38,8 +38,7 @@ function WeeklyView({
   year: number
   month: number
   todayStr: string
-  onComplete: (date: string, habitId: number) => void
-  onNotComplete: (date: string, habitId: number) => void
+  onCycle: (date: string, habitId: number) => void
 }) {
   const currentWeekIdx = weeks.findIndex(week =>
     week.some(d => d && dateStr(year, month, d) === todayStr)
@@ -105,11 +104,10 @@ function WeeklyView({
                     return (
                       <div key={i} className="flex justify-center py-0.5">
                         <HabitCell
-                          state={matrix[ds]?.[habit.id]}
+                          state={matrix[ds]?.[habit.id] as any}
                           isToday={isToday}
                           isPast={isPast}
-                          onComplete={() => onComplete(ds, habit.id)}
-                          onNotComplete={() => onNotComplete(ds, habit.id)}
+                          onCycle={() => onCycle(ds, habit.id)}
                         />
                       </div>
                     )
@@ -127,15 +125,14 @@ function WeeklyView({
 // ── Monthly view ─────────────────────────────────────────────────────────────
 
 function MonthlyView({
-  habits, matrix, year, month, todayStr, onComplete, onNotComplete,
+  habits, matrix, year, month, todayStr, onCycle,
 }: {
   habits: Habit[]
   matrix: RecordMatrix
   year: number
   month: number
   todayStr: string
-  onComplete: (date: string, habitId: number) => void
-  onNotComplete: (date: string, habitId: number) => void
+  onCycle: (date: string, habitId: number) => void
 }) {
   const days = daysInMonth(year, month)
   const allDays = Array.from({ length: days }, (_, i) => i + 1)
@@ -189,11 +186,10 @@ function MonthlyView({
                   >
                     <div className="flex justify-center">
                       <HabitCell
-                        state={matrix[ds]?.[habit.id]}
+                        state={matrix[ds]?.[habit.id] as any}
                         isToday={isToday}
                         isPast={isPast}
-                        onComplete={() => onComplete(ds, habit.id)}
-                        onNotComplete={() => onNotComplete(ds, habit.id)}
+                        onCycle={() => onCycle(ds, habit.id)}
                         size="sm"
                       />
                     </div>
@@ -247,7 +243,7 @@ export default function HabitTrackerPage() {
     const m: RecordMatrix = {}
     for (const r of records) {
       if (!m[r.date]) m[r.date] = {}
-      m[r.date][r.habit_id] = r.completed
+      m[r.date][r.habit_id] = r.state
     }
     setMatrix(m)
     setPrevMonthDone(Object.values(prevSummary).reduce((a, b) => a + b, 0))
@@ -264,31 +260,23 @@ export default function HabitTrackerPage() {
     if (month === 12) { setMonth(1); setYear(y => y + 1) } else setMonth(m => m + 1)
   }
 
-  // Cell handlers with optimistic update
-  // Click/tap: verde. Si ya era verde → vacío. Si era rojo → verde.
-  async function handleComplete(ds: string, habitId: number) {
-    const current = matrix[ds]?.[habitId]
-    const next = current === true ? null : true
-    setMatrix(prev => {
-      const updated = { ...prev, [ds]: { ...(prev[ds] ?? {}) } }
-      if (next === null) delete updated[ds][habitId]
-      else updated[ds][habitId] = next
-      return updated
-    })
-    try { await setRecord(ds, habitId, next) } catch { load() }
+  function nextState(s: string | undefined): string | undefined {
+    if (s === undefined) return 'done'
+    if (s === 'done') return 'rest'
+    if (s === 'rest') return 'failed'
+    return undefined
   }
 
-  // Doble click / press largo: rojo. Si ya era rojo → vacío. Si era verde → rojo.
-  async function handleNotComplete(ds: string, habitId: number) {
+  async function handleCycle(ds: string, habitId: number) {
     const current = matrix[ds]?.[habitId]
-    const next = current === false ? null : false
+    const next = nextState(current)
     setMatrix(prev => {
       const updated = { ...prev, [ds]: { ...(prev[ds] ?? {}) } }
-      if (next === null) delete updated[ds][habitId]
+      if (next === undefined) delete updated[ds][habitId]
       else updated[ds][habitId] = next
       return updated
     })
-    try { await setRecord(ds, habitId, next) } catch { load() }
+    try { await setRecord(ds, habitId, next ?? null) } catch { load() }
   }
 
   // Today's progress
@@ -298,12 +286,12 @@ export default function HabitTrackerPage() {
   // ── Insights ──
   const monthlySummary: Record<string, number> = {}
   for (const [date, dayRec] of Object.entries(matrix)) {
-    monthlySummary[date] = Object.values(dayRec).filter(v => v === true).length
+    monthlySummary[date] = Object.values(dayRec).filter(v => v === 'done').length
   }
   const { current: currentStreak } = streak(monthlySummary, habits.length, year, month)
   const days = daysInMonth(year, month)
   const habitPcts = habits.map(h => {
-    const done = Object.values(matrix).filter(dayRec => dayRec[h.id] === true).length
+    const done = Object.values(matrix).filter(dayRec => dayRec[h.id] === 'done').length
     return { id: h.id, name: h.name, pct: days > 0 ? Math.round(done / days * 100) : 0 }
   })
   const bestHabit = habitPcts.length > 0 ? habitPcts.reduce((a, b) => a.pct >= b.pct ? a : b) : null
@@ -405,8 +393,7 @@ export default function HabitTrackerPage() {
           year={year}
           month={month}
           todayStr={today}
-          onComplete={handleComplete}
-          onNotComplete={handleNotComplete}
+          onCycle={handleCycle}
         />
         </div>
       ) : (
@@ -417,8 +404,7 @@ export default function HabitTrackerPage() {
           year={year}
           month={month}
           todayStr={today}
-          onComplete={handleComplete}
-          onNotComplete={handleNotComplete}
+          onCycle={handleCycle}
         />
         </div>
       )}

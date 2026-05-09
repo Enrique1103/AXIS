@@ -44,25 +44,19 @@ export const getMonthSummary = (year: number, month: number): Promise<MonthSumma
 export const getMonthByHabit = (year: number, month: number): Promise<HabitMonthStats> =>
   req(`/records/month/${year}/${month}/habits`)
 
-export const toggleRecord = (date: string, habitId: number): Promise<{ completed: boolean }> =>
-  req("/records/toggle", {
-    method: "POST",
-    body: JSON.stringify({ date, habit_id: habitId, completed: true }),
-  })
-
 export const getWeeklyTrend = (): Promise<{ week_start: string; label: string; pct: number }[]> =>
   req(`/records/weekly-trend`)
 
 export const getWeekdayAvg = (months = 3): Promise<Record<string, number>> =>
   req(`/records/weekday-avg?months=${months}`)
 
-export const getMonthAll = (year: number, month: number): Promise<{ date: string; habit_id: number; completed: boolean }[]> =>
+export const getMonthAll = (year: number, month: number): Promise<{ date: string; habit_id: number; state: string }[]> =>
   req(`/records/month-all/${year}/${month}`)
 
-export const setRecord = (date: string, habitId: number, completed: boolean | null): Promise<{ completed: boolean | null }> =>
+export const setRecord = (date: string, habitId: number, state: string | null): Promise<{ state: string | null }> =>
   req("/records/set", {
     method: "POST",
-    body: JSON.stringify({ date, habit_id: habitId, completed }),
+    body: JSON.stringify({ date, habit_id: habitId, state }),
   })
 
 export const resetMonth = (year: number, month: number): Promise<void> =>

@@ -12,16 +12,10 @@ class HabitUpdate(BaseModel):
     ord: Optional[int] = None
 
 
-class RecordToggle(BaseModel):
-    date: str       # ISO format: "2025-05-02"
-    habit_id: int
-    completed: bool
-
-
 class RecordSet(BaseModel):
     date: str
     habit_id: int
-    completed: Optional[bool] = None  # None = borrar el registro
+    state: Optional[str] = None  # 'done' | 'rest' | 'failed' | None = borrar
 
 
 class TaskCreate(BaseModel):

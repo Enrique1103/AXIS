@@ -252,14 +252,18 @@ export default function StatsPage() {
             </div>
             <div className="space-y-2.5">
               {habits.map(h => {
-                const done = !!detail.records[h.id]
+                const state = detail.records[h.id]
+                const cfg =
+                  state === 'done'   ? { bg: "bg-green-500",  label: "✓", text: "text-zinc-100" } :
+                  state === 'rest'   ? { bg: "bg-zinc-500",   label: "−", text: "text-zinc-400" } :
+                  state === 'failed' ? { bg: "bg-red-500",    label: "✗", text: "text-zinc-400" } :
+                                       { bg: "bg-zinc-800",   label: "·", text: "text-zinc-500" }
                 return (
                   <div key={h.id} className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0
-                      ${done ? "bg-green-500 text-white" : "bg-zinc-800 text-zinc-500"}`}>
-                      {done ? "✓" : "·"}
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 text-white ${cfg.bg}`}>
+                      {cfg.label}
                     </span>
-                    <span className={`text-sm ${done ? "text-zinc-100" : "text-zinc-500"}`}>{h.name}</span>
+                    <span className={`text-sm ${cfg.text}`}>{h.name}</span>
                   </div>
                 )
               })}
