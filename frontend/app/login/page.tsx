@@ -46,10 +46,13 @@ export default function LoginPage() {
         router.refresh()
       }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) {
         setError(`Error: ${error.message}`)
         setLoading(false)
+      } else if (data.session) {
+        router.push("/")
+        router.refresh()
       } else {
         setSuccess("Cuenta creada. Revisa tu correo para confirmarla.")
         setLoading(false)
