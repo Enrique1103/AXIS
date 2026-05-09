@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 
-type RecordMatrix = Record<string, Record<number, boolean>>
+type RecordMatrix = Record<string, Record<number, string>>
 
 interface Props {
   matrix:     RecordMatrix
@@ -29,7 +29,7 @@ export function MonthlyEKGChart({ matrix, habitCount, year, month, todayStr }: P
       const d     = i + 1
       const date  = ds(year, month, d)
       const rec   = matrix[date] ?? {}
-      const done  = Object.values(rec).filter(v => v === true).length
+      const done  = Object.values(rec).filter(v => v === 'done').length
       return habitCount > 0 ? done / habitCount : 0
     }),
   [matrix, habitCount, year, month, days])
