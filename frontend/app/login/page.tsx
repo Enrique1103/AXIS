@@ -42,8 +42,7 @@ export default function LoginPage() {
         setError(error.message)
         setLoading(false)
       } else {
-        router.push("/")
-        router.refresh()
+        window.location.href = "/"
       }
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
@@ -51,8 +50,7 @@ export default function LoginPage() {
         setError(`Error: ${error.message}`)
         setLoading(false)
       } else if (data.session) {
-        router.push("/")
-        router.refresh()
+        window.location.href = "/"
       } else {
         setSuccess("Cuenta creada. Revisa tu correo para confirmarla.")
         setLoading(false)
