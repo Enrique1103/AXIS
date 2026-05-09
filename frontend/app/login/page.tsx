@@ -36,14 +36,6 @@ export default function LoginPage() {
     setError("")
     setSuccess("")
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    if (!url || !key) {
-      setError(`Variables de entorno no cargadas (URL: ${url ? "ok" : "FALTA"}, KEY: ${key ? "ok" : "FALTA"})`)
-      setLoading(false)
-      return
-    }
-
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
