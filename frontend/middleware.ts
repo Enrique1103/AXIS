@@ -18,12 +18,12 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
 
-  if (!user && req.nextUrl.pathname !== "/login") {
+  if (!session && req.nextUrl.pathname !== "/login") {
     return NextResponse.redirect(new URL("/login", req.url))
   }
-  if (user && req.nextUrl.pathname === "/login") {
+  if (session && req.nextUrl.pathname === "/login") {
     return NextResponse.redirect(new URL("/", req.url))
   }
 
@@ -32,6 +32,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.jpg|manifest\\.json|sw\\.js).*)",
+    "/((?!_next/static|_next/image|_next/|favicon\\.ico|.*\\.png|.*\\.svg|.*\\.jpg|.*\\.json|.*\\.js|.*\\.ico).*)",
   ],
 }
