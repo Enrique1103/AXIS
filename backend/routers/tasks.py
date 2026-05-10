@@ -75,8 +75,16 @@ def delete_task(task_id: int, user_id: str = Depends(get_user_id)):
     owned = db.table("tasks").select("id").eq("id", task_id).eq("user_id", user_id).execute()
     if not owned.data:
         return
-    subtasks = db.table("tasks").select("id").eq("parent_task_id", task_id).execute().data
-    all_ids = [task_id] + [s["id"] for s in subtasks]
+    all_user_tasks = db.table("tasks").select("id, parent_task_id").eq("user_id", user_id).execute().data
+
+    def collect_descendants(tid: int) -> list[int]:
+        children = [t["id"] for t in all_user_tasks if t["parent_task_id"] == tid]
+        result = list(children)
+        for child_id in children:
+            result.extend(collect_descendants(child_id))
+        return result
+
+    all_ids = [task_id] + collect_descendants(task_id)
     db.table("task_deps").delete().in_("task_id", all_ids).execute()
     db.table("task_deps").delete().in_("depends_on_task_id", all_ids).execute()
     db.table("tasks").delete().in_("id", all_ids).eq("user_id", user_id).execute()
