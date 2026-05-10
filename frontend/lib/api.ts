@@ -4,8 +4,13 @@ import { supabase } from "./supabase"
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession()
+  let { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    const refreshed = await supabase.auth.refreshSession()
+    session = refreshed.data.session
+  }
   const token = session?.access_token
+  console.log("[API] session:", session ? "ok" : "null", "| token:", token ? token.slice(0, 30) + "..." : "MISSING")
 
   const res = await fetch(`${BASE}${path}`, {
     headers: {
