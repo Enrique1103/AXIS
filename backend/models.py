@@ -20,8 +20,9 @@ class RecordSet(BaseModel):
 
 class TaskCreate(BaseModel):
     title: str
-    type: str          # "daily" | "weekly" | "monthly"
-    deadline: Optional[str] = None   # ISO date string
+    type: str
+    deadline: Optional[str] = None
+    parent_task_id: Optional[int] = None
 
 
 class TaskUpdate(BaseModel):

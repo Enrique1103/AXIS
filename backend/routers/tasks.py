@@ -13,7 +13,17 @@ def get_tasks(type: Optional[str] = None, user_id: str = Depends(get_user_id)):
     q = db.table("tasks").select("*").eq("user_id", user_id).order("created_at", desc=True)
     if type:
         q = q.eq("type", type)
-    return q.execute().data
+    tasks = q.execute().data
+
+    deps = db.table("task_deps").select("task_id, depends_on_task_id").execute().data
+    deps_map: dict[int, list[int]] = {}
+    for d in deps:
+        deps_map.setdefault(d["task_id"], []).append(d["depends_on_task_id"])
+
+    for task in tasks:
+        task["dep_ids"] = deps_map.get(task["id"], [])
+
+    return tasks
 
 
 @router.post("/")
@@ -25,8 +35,11 @@ def create_task(body: TaskCreate, user_id: str = Depends(get_user_id)):
         "deadline": body.deadline,
         "completed": False,
         "user_id": user_id,
+        "parent_task_id": body.parent_task_id,
     }).execute()
-    return res.data[0]
+    task = res.data[0]
+    task["dep_ids"] = []
+    return task
 
 
 @router.patch("/{task_id}")
@@ -34,10 +47,28 @@ def update_task(task_id: int, body: TaskUpdate, user_id: str = Depends(get_user_
     db = get_db()
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     res = db.table("tasks").update(data).eq("id", task_id).eq("user_id", user_id).execute()
-    return res.data[0]
+    task = res.data[0]
+    deps = db.table("task_deps").select("depends_on_task_id").eq("task_id", task_id).execute().data
+    task["dep_ids"] = [d["depends_on_task_id"] for d in deps]
+    return task
 
 
 @router.delete("/{task_id}", status_code=204)
 def delete_task(task_id: int, user_id: str = Depends(get_user_id)):
     db = get_db()
     db.table("tasks").delete().eq("id", task_id).eq("user_id", user_id).execute()
+
+
+@router.post("/{task_id}/deps/{dep_id}", status_code=201)
+def add_dep(task_id: int, dep_id: int, user_id: str = Depends(get_user_id)):
+    db = get_db()
+    existing = db.table("task_deps").select("id").eq("task_id", task_id).eq("depends_on_task_id", dep_id).execute()
+    if not existing.data:
+        db.table("task_deps").insert({"task_id": task_id, "depends_on_task_id": dep_id}).execute()
+    return {"ok": True}
+
+
+@router.delete("/{task_id}/deps/{dep_id}", status_code=204)
+def remove_dep(task_id: int, dep_id: int, user_id: str = Depends(get_user_id)):
+    db = get_db()
+    db.table("task_deps").delete().eq("task_id", task_id).eq("depends_on_task_id", dep_id).execute()

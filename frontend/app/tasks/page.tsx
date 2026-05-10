@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Check, CalendarDays, X } from "lucide-react"
-import { getTasks, createTask, updateTask, deleteTask } from "@/lib/api"
+import { Plus, Trash2, Check, CalendarDays, X, ChevronRight, Lock, GitBranch } from "lucide-react"
+import { getTasks, createTask, updateTask, deleteTask, addTaskDep, removeTaskDep } from "@/lib/api"
 import { Task } from "@/lib/types"
 import { SankeyChart } from "@/components/sankey-chart"
 
@@ -14,9 +14,10 @@ const TABS: { key: TabKey; label: string; color: string }[] = [
   { key: "monthly", label: "Mensuales", color: "text-violet-400" },
 ]
 
+const today = new Date().toISOString().slice(0, 10)
+
 function isOverdue(task: Task) {
-  if (!task.deadline || task.completed) return false
-  return task.deadline < new Date().toISOString().slice(0, 10)
+  return !task.completed && !!task.deadline && task.deadline < today
 }
 
 function fmtDate(iso: string) {
@@ -24,64 +25,311 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`
 }
 
-export default function TasksPage() {
-  const [tab, setTab]     = useState<TabKey>("daily")
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [allTasks, setAllTasks] = useState<Task[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [newTitle, setNewTitle]       = useState("")
-  const [newDeadline, setNewDeadline] = useState("")
-  const [saving, setSaving] = useState(false)
+function isBlocked(task: Task, allTasks: Task[]) {
+  return task.dep_ids.some(depId => {
+    const dep = allTasks.find(t => t.id === depId)
+    return dep && !dep.completed
+  })
+}
 
-  const today = new Date().toISOString().slice(0, 10)
+// ── Dep picker modal ──────────────────────────────────────────────────────────
 
-  function loadAll() { getTasks().then(setAllTasks) }
+function DepPickerModal({ task, allTasks, onAdd, onRemove, onClose }: {
+  task: Task
+  allTasks: Task[]
+  onAdd: (depId: number) => void
+  onRemove: (depId: number) => void
+  onClose: () => void
+}) {
+  const candidates = allTasks.filter(t =>
+    t.id !== task.id &&
+    t.parent_task_id === null &&
+    !task.dep_ids.includes(t.id)
+  )
 
-  useEffect(() => {
-    setLoading(true)
-    getTasks(tab).then(t => { setTasks(t); setLoading(false) })
-  }, [tab])
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm px-4 pb-4">
+      <div className="w-full max-w-sm bg-zinc-900 border border-slate-700/40 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/40">
+          <p className="text-sm font-semibold text-zinc-100">Dependencias de "{task.title}"</p>
+          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-zinc-300"><X size={16}/></button>
+        </div>
+        <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
+          {task.dep_ids.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider">Actuales</p>
+              {task.dep_ids.map(depId => {
+                const dep = allTasks.find(t => t.id === depId)
+                if (!dep) return null
+                return (
+                  <div key={depId} className="flex items-center justify-between gap-2 px-3 py-2 bg-zinc-800 rounded-xl">
+                    <span className={`text-sm flex-1 truncate ${dep.completed ? "line-through text-zinc-500" : "text-zinc-200"}`}>
+                      {dep.title}
+                    </span>
+                    <button onClick={() => onRemove(depId)} className="text-zinc-600 hover:text-red-400 transition-colors">
+                      <X size={14}/>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {candidates.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider">Agregar</p>
+              {candidates.map(t => (
+                <button key={t.id} onClick={() => onAdd(t.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-left transition-colors">
+                  <Plus size={13} className="text-zinc-500 shrink-0"/>
+                  <span className="text-sm text-zinc-300 truncate">{t.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {task.dep_ids.length === 0 && candidates.length === 0 && (
+            <p className="text-sm text-zinc-600 text-center py-4">No hay tareas disponibles</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  useEffect(() => { loadAll() }, [])
+// ── Task node ─────────────────────────────────────────────────────────────────
+
+function TaskNode({ task, allTasks, subtasks, onToggle, onDelete, onAddSub, onOpenDeps, tab }: {
+  task: Task
+  allTasks: Task[]
+  subtasks: Task[]
+  onToggle: (t: Task) => void
+  onDelete: (id: number) => void
+  onAddSub: (parentId: number) => void
+  onOpenDeps: (t: Task) => void
+  tab: TabKey
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const blocked = isBlocked(task, allTasks)
+  const overdue = isOverdue(task)
+  const hasDeps = task.dep_ids.length > 0
+
+  const depTitles = task.dep_ids
+    .map(id => allTasks.find(t => t.id === id))
+    .filter(Boolean) as Task[]
+  const pendingDeps = depTitles.filter(d => !d.completed)
+
+  return (
+    <div className="space-y-1">
+      {/* Main node */}
+      <div className={`gc rounded-xl transition-all
+        ${blocked ? "opacity-60 !border-zinc-700" : ""}
+        ${overdue && !blocked ? "!border-red-500/40" : ""}`}>
+
+        <div className="flex items-center gap-2 px-3 py-3">
+          {/* Expand toggle if has subtasks */}
+          {subtasks.length > 0 ? (
+            <button onClick={() => setExpanded(e => !e)}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0">
+              <ChevronRight size={15} className={`transition-transform ${expanded ? "rotate-90" : ""}`}/>
+            </button>
+          ) : (
+            <div className="w-[15px] shrink-0"/>
+          )}
+
+          {/* Checkbox */}
+          <button onClick={() => !blocked && onToggle(task)} disabled={blocked}
+            className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors
+              ${task.completed
+                ? "bg-green-500"
+                : blocked
+                  ? "bg-zinc-800 border border-zinc-700 cursor-not-allowed"
+                  : "bg-zinc-800 border border-zinc-700 hover:border-green-500/50"}`}>
+            {task.completed && <Check size={12} className="text-black"/>}
+            {blocked && !task.completed && <Lock size={10} className="text-zinc-600"/>}
+          </button>
+
+          {/* Title + info */}
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm leading-snug ${task.completed ? "line-through text-zinc-500" : blocked ? "text-zinc-500" : "text-zinc-100"}`}>
+              {task.title}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+              {task.deadline && (
+                <span className={`text-xs flex items-center gap-1
+                  ${overdue ? "text-red-400" : "text-zinc-600"}`}>
+                  <CalendarDays size={10}/>
+                  {fmtDate(task.deadline)}
+                </span>
+              )}
+              {pendingDeps.length > 0 && (
+                <span className="text-xs text-amber-500/80 flex items-center gap-1">
+                  <Lock size={9}/>
+                  {pendingDeps.map(d => d.title).join(", ")}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button onClick={() => onOpenDeps(task)}
+              className={`p-1.5 rounded-lg transition-colors
+                ${hasDeps ? "text-amber-400 hover:bg-amber-500/10" : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800"}`}
+              title="Dependencias">
+              <GitBranch size={13}/>
+            </button>
+            <button onClick={() => onAddSub(task.id)}
+              className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800 transition-colors"
+              title="Agregar subtarea">
+              <Plus size={13}/>
+            </button>
+            <button onClick={() => onDelete(task.id)}
+              className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+              <Trash2 size={13}/>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Subtasks */}
+      {expanded && subtasks.length > 0 && (
+        <div className="ml-6 pl-3 border-l border-zinc-800 space-y-1">
+          {subtasks.map(sub => {
+            const subBlocked = isBlocked(sub, allTasks)
+            const subOverdue = isOverdue(sub)
+            return (
+              <div key={sub.id} className={`gc rounded-xl flex items-center gap-2 px-3 py-2.5 transition-all
+                ${subBlocked ? "opacity-60 !border-zinc-700" : ""}
+                ${subOverdue && !subBlocked ? "!border-red-500/40" : ""}`}>
+                <button onClick={() => !subBlocked && onToggle(sub)} disabled={subBlocked}
+                  className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-colors
+                    ${sub.completed
+                      ? "bg-green-500"
+                      : subBlocked
+                        ? "bg-zinc-800 border border-zinc-700 cursor-not-allowed"
+                        : "bg-zinc-800 border border-zinc-700 hover:border-green-500/50"}`}>
+                  {sub.completed && <Check size={10} className="text-black"/>}
+                  {subBlocked && !sub.completed && <Lock size={8} className="text-zinc-600"/>}
+                </button>
+                <p className={`flex-1 text-xs leading-snug
+                  ${sub.completed ? "line-through text-zinc-600" : subBlocked ? "text-zinc-500" : "text-zinc-200"}`}>
+                  {sub.title}
+                </p>
+                {sub.deadline && (
+                  <span className={`text-[10px] ${subOverdue ? "text-red-400" : "text-zinc-600"}`}>
+                    {fmtDate(sub.deadline)}
+                  </span>
+                )}
+                <button onClick={() => onDelete(sub.id)}
+                  className="p-1 text-zinc-700 hover:text-red-400 transition-colors">
+                  <Trash2 size={12}/>
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Add task form ─────────────────────────────────────────────────────────────
+
+function AddForm({ tab, parentId, onAdd, onCancel }: {
+  tab: TabKey
+  parentId?: number
+  onAdd: (title: string, deadline: string, parentId?: number) => Promise<void>
+  onCancel: () => void
+}) {
+  const [title, setTitle]       = useState("")
+  const [deadline, setDeadline] = useState("")
+  const [saving, setSaving]     = useState(false)
 
   async function handleAdd() {
-    if (!newTitle.trim() || saving) return
+    if (!title.trim() || saving) return
     setSaving(true)
-    try {
-      const t = await createTask({
-        title: newTitle.trim(),
-        type: tab,
-        deadline: newDeadline || undefined,
-      })
-      setTasks(prev => [t, ...prev])
-      setNewTitle("")
-      setNewDeadline("")
-      setShowForm(false)
-      loadAll()
-    } finally { setSaving(false) }
+    try { await onAdd(title.trim(), deadline, parentId) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="gc p-3 space-y-2">
+      <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") onCancel() }}
+        placeholder={parentId ? "Título de la subtarea…" : "Título de la tarea…"}
+        className="w-full bg-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-green-500/50"/>
+      <div className="flex items-center gap-2">
+        <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
+          className="flex-1 bg-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-400 focus:outline-none focus:ring-1 focus:ring-green-500/50"/>
+        <button onClick={handleAdd} disabled={!title.trim() || saving}
+          className="px-3 py-1.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-40 text-xs font-semibold text-black transition-colors">
+          {saving ? "…" : "Agregar"}
+        </button>
+        <button onClick={onCancel} className="p-1.5 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
+          <X size={14}/>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export default function TasksPage() {
+  const [tab, setTab]         = useState<TabKey>("daily")
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm]   = useState(false)
+  const [addingSubOf, setAddingSubOf] = useState<number | null>(null)
+  const [depsFor, setDepsFor] = useState<Task | null>(null)
+
+  async function load() {
+    const tasks = await getTasks()
+    setAllTasks(tasks)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const tabTasks = allTasks.filter(t => t.type === tab)
+  const roots    = tabTasks.filter(t => t.parent_task_id === null)
+  const pending  = roots.filter(t => !t.completed)
+  const completed = roots.filter(t => t.completed)
+
+  const sankeyData = {
+    completed: allTasks.filter(t => t.completed).length,
+    overdue:   allTasks.filter(t => !t.completed && !!t.deadline && t.deadline < today).length,
+    pending:   allTasks.filter(t => !t.completed && (!t.deadline || t.deadline >= today)).length,
+  }
+
+  async function handleAdd(title: string, deadline: string, parentId?: number) {
+    await createTask({ title, type: tab, deadline: deadline || undefined, parent_task_id: parentId })
+    setShowForm(false)
+    setAddingSubOf(null)
+    await load()
   }
 
   async function handleToggle(task: Task) {
-    const updated = await updateTask(task.id, { completed: !task.completed })
-    setTasks(prev => prev.map(t => t.id === task.id ? updated : t))
-    loadAll()
+    await updateTask(task.id, { completed: !task.completed })
+    await load()
   }
 
   async function handleDelete(id: number) {
     await deleteTask(id)
-    setTasks(prev => prev.filter(t => t.id !== id))
-    loadAll()
+    setAllTasks(prev => prev.filter(t => t.id !== id && t.parent_task_id !== id))
   }
 
-  const sankeyData = {
-    completed: allTasks.filter(t => t.completed).length,
-    overdue:   allTasks.filter(t => !t.completed && t.deadline && t.deadline < today).length,
-    pending:   allTasks.filter(t => !t.completed && (!t.deadline || t.deadline >= today)).length,
+  async function handleAddDep(depId: number) {
+    if (!depsFor) return
+    await addTaskDep(depsFor.id, depId)
+    await load()
+    setDepsFor(prev => prev ? { ...prev, dep_ids: [...prev.dep_ids, depId] } : prev)
   }
 
-  const pending   = tasks.filter(t => !t.completed)
-  const completed = tasks.filter(t => t.completed)
+  async function handleRemoveDep(depId: number) {
+    if (!depsFor) return
+    await removeTaskDep(depsFor.id, depId)
+    await load()
+    setDepsFor(prev => prev ? { ...prev, dep_ids: prev.dep_ids.filter(id => id !== depId) } : prev)
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-8">
@@ -89,8 +337,6 @@ export default function TasksPage() {
       {/* Header */}
       <div className="px-4 pt-4 pb-4 bg-[var(--sticky-bg)] border-b border-slate-700/40 sticky top-[128px] z-10">
         <h1 className="text-lg font-bold mb-3">Tareas</h1>
-
-        {/* Tabs */}
         <div className="flex gap-1 bg-zinc-800/60 p-1 rounded-xl">
           {TABS.map(({ key, label, color }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -104,70 +350,32 @@ export default function TasksPage() {
 
       <div className="p-4 space-y-4">
 
-        {/* ── Análisis de Fuga de Energía ── */}
+        {/* Sankey */}
         {allTasks.length > 0 && (
-          <div className="gc p-4"
-            style={{ borderColor: sankeyData.overdue > 0 ? "rgba(239,68,68,0.25)" : undefined }}>
+          <div className="gc p-4" style={{ borderColor: sankeyData.overdue > 0 ? "rgba(239,68,68,0.25)" : undefined }}>
             <div className="flex items-start justify-between mb-3">
               <div>
                 <p className="text-xs font-semibold text-zinc-200">Análisis de Fuga de Energía</p>
-                <p className="text-[10px] text-zinc-500 mt-0.5">
-                  Flujo de todas tus tareas · {allTasks.length} en total
-                </p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">{allTasks.length} tareas en total</p>
               </div>
               {sankeyData.overdue > 0 && (
-                <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20
-                  px-2 py-1 rounded-lg font-medium shrink-0">
+                <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg font-medium shrink-0">
                   ⚡ {sankeyData.overdue} vencida{sankeyData.overdue > 1 ? "s" : ""}
                 </span>
               )}
             </div>
-            <SankeyChart data={sankeyData} />
+            <SankeyChart data={sankeyData}/>
           </div>
         )}
 
-        {/* Form para nueva tarea */}
+        {/* Add form */}
         {showForm ? (
-          <div className="gc p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-zinc-300">Nueva tarea</p>
-              <button onClick={() => { setShowForm(false); setNewTitle(""); setNewDeadline("") }}
-                className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-500">
-                <X size={15}/>
-              </button>
-            </div>
-            <input
-              autoFocus
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleAdd()}
-              placeholder="Título de la tarea…"
-              className="w-full bg-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-100
-                placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-green-500/50"
-            />
-            <div className="flex items-center gap-2">
-              <CalendarDays size={15} className="text-zinc-500 shrink-0"/>
-              <input
-                type="date"
-                value={newDeadline}
-                onChange={e => setNewDeadline(e.target.value)}
-                className="flex-1 bg-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-300
-                  focus:outline-none focus:ring-1 focus:ring-green-500/50"
-              />
-              <span className="text-xs text-zinc-600">plazo (opc.)</span>
-            </div>
-            <button onClick={handleAdd} disabled={!newTitle.trim() || saving}
-              className="w-full py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-40
-                text-sm font-semibold text-black transition-colors">
-              {saving ? "Guardando…" : "Agregar tarea"}
-            </button>
-          </div>
+          <AddForm tab={tab} onAdd={handleAdd} onCancel={() => setShowForm(false)}/>
         ) : (
           <button onClick={() => setShowForm(true)}
-            className="w-full flex items-center gap-2 py-3 px-4 rounded-2xl border border-dashed
-              border-zinc-700 text-zinc-500 hover:border-green-500/50 hover:text-green-400 transition-colors">
+            className="w-full flex items-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-zinc-700 text-zinc-500 hover:border-green-500/50 hover:text-green-400 transition-colors">
             <Plus size={16}/>
-            <span className="text-sm">Agregar {TABS.find(t=>t.key===tab)?.label.toLowerCase().replace("es","")}</span>
+            <span className="text-sm">Nueva tarea</span>
           </button>
         )}
 
@@ -177,82 +385,67 @@ export default function TasksPage() {
           </div>
         ) : (
           <>
-            {/* Pendientes */}
-            {pending.length > 0 && (
-              <div className="space-y-2">
-                {pending.map(task => (
-                  <TaskCard key={task.id} task={task}
-                    onToggle={() => handleToggle(task)}
-                    onDelete={() => handleDelete(task.id)}/>
-                ))}
-              </div>
-            )}
+            {/* Pending */}
+            <div className="space-y-2">
+              {pending.map(task => {
+                const subtasks = allTasks.filter(t => t.parent_task_id === task.id)
+                return (
+                  <div key={task.id}>
+                    <TaskNode
+                      task={task}
+                      allTasks={allTasks}
+                      subtasks={subtasks}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                      onAddSub={id => setAddingSubOf(id)}
+                      onOpenDeps={setDepsFor}
+                      tab={tab}
+                    />
+                    {addingSubOf === task.id && (
+                      <div className="ml-6 pl-3 border-l border-zinc-800 mt-1">
+                        <AddForm tab={tab} parentId={task.id} onAdd={handleAdd} onCancel={() => setAddingSubOf(null)}/>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
-            {/* Completadas */}
+            {/* Completed */}
             {completed.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-widest text-zinc-600 px-1 pt-2">
                   Completadas ({completed.length})
                 </p>
-                {completed.map(task => (
-                  <TaskCard key={task.id} task={task}
-                    onToggle={() => handleToggle(task)}
-                    onDelete={() => handleDelete(task.id)}/>
-                ))}
+                {completed.map(task => {
+                  const subtasks = allTasks.filter(t => t.parent_task_id === task.id)
+                  return (
+                    <TaskNode key={task.id} task={task} allTasks={allTasks} subtasks={subtasks}
+                      onToggle={handleToggle} onDelete={handleDelete}
+                      onAddSub={id => setAddingSubOf(id)} onOpenDeps={setDepsFor} tab={tab}/>
+                  )
+                })}
               </div>
             )}
 
-            {tasks.length === 0 && (
+            {tabTasks.length === 0 && (
               <div className="text-center py-12 text-zinc-600">
-                <p className="text-sm">Sin tareas {TABS.find(t=>t.key===tab)?.label.toLowerCase()}</p>
+                <p className="text-sm">Sin tareas {TABS.find(t => t.key === tab)?.label.toLowerCase()}</p>
               </div>
             )}
           </>
         )}
       </div>
-    </div>
-  )
-}
 
-// ── Task card ─────────────────────────────────────────────────────────────────
-
-function TaskCard({ task, onToggle, onDelete }: {
-  task: Task
-  onToggle: () => void
-  onDelete: () => void
-}) {
-  const overdue = isOverdue(task)
-
-  return (
-    <div className={`gc rounded-xl flex items-center gap-3 px-3 py-3 transition-all
-      ${overdue ? "!border-red-500/40" : ""}`}>
-
-      <button onClick={onToggle}
-        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors
-          ${task.completed
-            ? "bg-green-500 hover:bg-green-400"
-            : "bg-zinc-800 hover:bg-zinc-700 border border-zinc-700"}`}>
-        {task.completed && <Check size={14} className="text-black"/>}
-      </button>
-
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm leading-snug
-          ${task.completed ? "line-through text-zinc-500" : "text-zinc-100"}`}>
-          {task.title}
-        </p>
-        {task.deadline && (
-          <p className={`text-xs mt-0.5 flex items-center gap-1
-            ${overdue ? "text-red-400" : "text-zinc-500"}`}>
-            <CalendarDays size={10}/>
-            {overdue ? "Vencida · " : ""}{fmtDate(task.deadline)}
-          </p>
-        )}
-      </div>
-
-      <button onClick={onDelete}
-        className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors">
-        <Trash2 size={14}/>
-      </button>
+      {depsFor && (
+        <DepPickerModal
+          task={depsFor}
+          allTasks={allTasks}
+          onAdd={handleAddDep}
+          onRemove={handleRemoveDep}
+          onClose={() => setDepsFor(null)}
+        />
+      )}
     </div>
   )
 }

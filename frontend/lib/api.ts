@@ -97,7 +97,7 @@ export const detachHabit = (goalId: number, habitId: string): Promise<void> =>
 export const getTasks = (type?: string): Promise<Task[]> =>
   req(`/tasks${type ? `?type=${type}` : ""}`)
 
-export const createTask = (data: { title: string; type: string; deadline?: string }): Promise<Task> =>
+export const createTask = (data: { title: string; type: string; deadline?: string; parent_task_id?: number }): Promise<Task> =>
   req("/tasks", { method: "POST", body: JSON.stringify(data) })
 
 export const updateTask = (id: number, data: { title?: string; completed?: boolean; deadline?: string | null }): Promise<Task> =>
@@ -105,3 +105,9 @@ export const updateTask = (id: number, data: { title?: string; completed?: boole
 
 export const deleteTask = (id: number): Promise<void> =>
   req(`/tasks/${id}`, { method: "DELETE" })
+
+export const addTaskDep = (taskId: number, depId: number): Promise<void> =>
+  req(`/tasks/${taskId}/deps/${depId}`, { method: "POST" })
+
+export const removeTaskDep = (taskId: number, depId: number): Promise<void> =>
+  req(`/tasks/${taskId}/deps/${depId}`, { method: "DELETE" })

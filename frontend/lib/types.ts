@@ -40,4 +40,6 @@ export interface Task {
   deadline: string | null
   completed: boolean
   created_at: string
+  parent_task_id: number | null
+  dep_ids: number[]
 }
