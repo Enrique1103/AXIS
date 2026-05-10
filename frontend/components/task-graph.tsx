@@ -70,13 +70,12 @@ function computeLayout(tasks: Task[]): Map<number, { x: number; y: number }> {
 
 // ── Node ─────────────────────────────────────────────────────────────────────
 
-function GraphNode({ task, p, allTasks, hasSubs, onPointerDown, onClick, today }: {
+function GraphNode({ task, p, allTasks, hasSubs, onPointerDown, today }: {
   task: Task
   p: { x: number; y: number }
   allTasks: Task[]
   hasSubs: boolean
   onPointerDown: (e: React.PointerEvent<SVGRectElement>) => void
-  onClick: () => void
   today: string
 }) {
   const blocked = isBlocked(task, allTasks)
@@ -94,7 +93,7 @@ function GraphNode({ task, p, allTasks, hasSubs, onPointerDown, onClick, today }
   const metaY   = p.y + NODE_H / 2 + 9
 
   return (
-    <g onClick={onClick}>
+    <g style={{ cursor: hasSubs ? "pointer" : "default" }}>
       {/* Drag-handle card */}
       <rect
         x={p.x} y={p.y}
@@ -202,15 +201,18 @@ function GraphCanvas({ tasks, allTasks, onNodeClick }: {
   }
 
   function onSvgPointerUp(e: React.PointerEvent<SVGSVGElement>) {
+    const d = dragRef.current
     dragRef.current = null
     setIsDragging(false)
     svgRef.current?.releasePointerCapture(e.pointerId)
-  }
 
-  function handleNodeClick(task: Task) {
-    if (hasMoved.current) return
-    const hasSubs = allTasks.some(t => t.parent_task_id === task.id)
-    if (hasSubs) onNodeClick(task)
+    // Treat as click if pointer barely moved
+    if (!hasMoved.current && d !== null) {
+      const task = tasks.find(t => t.id === d.id)
+      if (task && allTasks.some(t => t.parent_task_id === task.id)) {
+        onNodeClick(task)
+      }
+    }
   }
 
   return (
@@ -294,7 +296,6 @@ function GraphCanvas({ tasks, allTasks, onNodeClick }: {
             hasSubs={hasSubs}
             today={today}
             onPointerDown={e => onNodePointerDown(e, task.id)}
-            onClick={() => handleNodeClick(task)}
           />
         )
       })}
