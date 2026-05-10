@@ -397,7 +397,7 @@ export default function TasksPage() {
           </div>
         ) : view === "graph" ? (
           <>
-            <TaskGraph tasks={roots} allTasks={allTasks}/>
+            <TaskGraph tasks={roots} allTasks={allTasks} onAddTask={handleAddTask}/>
             {roots.length === 0 && (
               <div className="text-center py-12 text-zinc-600">
                 <p className="text-sm">Sin tareas {TABS.find(t => t.key === tab)?.label.toLowerCase()}</p>
