@@ -22,6 +22,17 @@ export interface HabitMonthStats {
   [habitId: string]: number
 }
 
+export interface Goal {
+  id: number
+  title: string
+  description: string | null
+  commitment: string | null
+  deadline: string | null
+  image_url: string | null
+  created_at: string
+  habit_ids: string[]
+}
+
 export interface Task {
   id: number
   title: string

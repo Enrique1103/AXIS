@@ -1,4 +1,4 @@
-import { Habit, DayRecords, MonthSummary, HabitMonthStats, Task } from "./types"
+import { Habit, DayRecords, MonthSummary, HabitMonthStats, Task, Goal } from "./types"
 import { supabase } from "./supabase"
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
@@ -69,6 +69,28 @@ export const resetMonth = (year: number, month: number): Promise<void> =>
 
 export const resetAll = (): Promise<void> =>
   req("/records/all", { method: "DELETE" })
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+// ── Goals ─────────────────────────────────────────────────────────────────────
+
+export const getGoals = (): Promise<Goal[]> =>
+  req("/goals")
+
+export const createGoal = (data: Omit<Goal, "id" | "created_at" | "habit_ids">): Promise<Goal> =>
+  req("/goals", { method: "POST", body: JSON.stringify(data) })
+
+export const updateGoal = (id: number, data: Partial<Omit<Goal, "id" | "created_at" | "habit_ids">>): Promise<Goal> =>
+  req(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(data) })
+
+export const deleteGoal = (id: number): Promise<void> =>
+  req(`/goals/${id}`, { method: "DELETE" })
+
+export const attachHabit = (goalId: number, habitId: string): Promise<void> =>
+  req(`/goals/${goalId}/habits/${habitId}`, { method: "POST" })
+
+export const detachHabit = (goalId: number, habitId: string): Promise<void> =>
+  req(`/goals/${goalId}/habits/${habitId}`, { method: "DELETE" })
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
