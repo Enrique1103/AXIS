@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState("")
   const [confirm, setConfirm]   = useState<null | "month" | "all">(null)
+  const [apiError, setApiError] = useState("")
 
   const [settings, setSettings] = useState<QuoteSettings>({
     habitTime: "21:00", quoteTime: "07:30", quoteCount: 1,
@@ -40,8 +41,13 @@ export default function SettingsPage() {
 
   async function handleAdd() {
     if (!newName.trim()) return
-    await createHabit(newName.trim())
-    setNewName(""); setAdding(false); load()
+    setApiError("")
+    try {
+      await createHabit(newName.trim())
+      setNewName(""); setAdding(false); load()
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Error desconocido")
+    }
   }
 
   async function handleRename(id: number) {
@@ -85,15 +91,18 @@ export default function SettingsPage() {
           </div>
 
           {adding && (
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/40 bg-zinc-800/40">
-              <input autoFocus value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") setAdding(false) }}
-                placeholder="Nombre del hábito"
-                className="flex-1 bg-transparent text-sm outline-none placeholder-zinc-500"
-              />
-              <button onClick={handleAdd} className="text-green-400 hover:text-green-300 p-1"><Check size={16}/></button>
-              <button onClick={() => setAdding(false)} className="text-zinc-500 hover:text-zinc-300 p-1"><X size={16}/></button>
+            <div className="border-b border-slate-700/40">
+              <div className="flex items-center gap-2 px-4 py-3 bg-zinc-800/40">
+                <input autoFocus value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setApiError("") } }}
+                  placeholder="Nombre del hábito"
+                  className="flex-1 bg-transparent text-sm outline-none placeholder-zinc-500"
+                />
+                <button onClick={handleAdd} className="text-green-400 hover:text-green-300 p-1"><Check size={16}/></button>
+                <button onClick={() => { setAdding(false); setApiError("") }} className="text-zinc-500 hover:text-zinc-300 p-1"><X size={16}/></button>
+              </div>
+              {apiError && <p className="px-4 py-1.5 text-xs text-red-400 bg-red-500/10">{apiError}</p>}
             </div>
           )}
 
