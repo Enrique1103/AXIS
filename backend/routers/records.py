@@ -3,8 +3,16 @@ from database import get_db
 from models import RecordSet
 from auth import get_user_id
 from datetime import date as date_type, timedelta
+import calendar
 
 router = APIRouter(prefix="/records", tags=["records"])
+
+
+def _month_range(year: int, month: int) -> tuple[str, str]:
+    start = f"{year:04d}-{month:02d}-01"
+    last_day = calendar.monthrange(year, month)[1]
+    end = f"{year:04d}-{month:02d}-{last_day:02d}"
+    return start, end
 
 
 @router.get("/day/{date}")
@@ -17,32 +25,35 @@ def get_day(date: str, user_id: str = Depends(get_user_id)):
 @router.get("/month/{year}/{month}")
 def get_month(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
-    prefix = f"{year:04d}-{month:02d}-"
+    start, end = _month_range(year, month)
     res = (db.table("records")
            .select("date")
-           .like("date", f"{prefix}%")
+           .gte("date", start)
+           .lte("date", end)
            .eq("state", "done")
            .eq("user_id", user_id)
            .execute())
     summary: dict[str, int] = {}
     for r in res.data:
-        summary[r["date"]] = summary.get(r["date"], 0) + 1
+        d = str(r["date"])
+        summary[d] = summary.get(d, 0) + 1
     return summary
 
 
 @router.get("/month/{year}/{month}/habits")
 def get_month_by_habit(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
-    prefix = f"{year:04d}-{month:02d}-"
+    start, end = _month_range(year, month)
     res = (db.table("records")
            .select("habit_id")
-           .like("date", f"{prefix}%")
+           .gte("date", start)
+           .lte("date", end)
            .eq("state", "done")
            .eq("user_id", user_id)
            .execute())
-    stats: dict[int, int] = {}
+    stats: dict[str, int] = {}
     for r in res.data:
-        hid = r["habit_id"]
+        hid = str(r["habit_id"])
         stats[hid] = stats.get(hid, 0) + 1
     return stats
 
@@ -50,13 +61,14 @@ def get_month_by_habit(year: int, month: int, user_id: str = Depends(get_user_id
 @router.get("/month-all/{year}/{month}")
 def get_month_all(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
-    prefix = f"{year:04d}-{month:02d}-"
+    start, end = _month_range(year, month)
     res = (db.table("records")
            .select("date, habit_id, state")
-           .like("date", f"{prefix}%")
+           .gte("date", start)
+           .lte("date", end)
            .eq("user_id", user_id)
            .execute())
-    return res.data
+    return [{"date": str(r["date"]), "habit_id": r["habit_id"], "state": r["state"]} for r in res.data]
 
 
 @router.post("/set")
@@ -99,7 +111,7 @@ def weekly_trend(user_id: str = Depends(get_user_id)):
     if not first_res.data:
         return []
 
-    first_date = date_type.fromisoformat(first_res.data[0]["date"])
+    first_date = date_type.fromisoformat(str(first_res.data[0]["date"]))
     first_monday = first_date - timedelta(days=first_date.weekday())
     today = date_type.today()
     current_monday = today - timedelta(days=today.weekday())
@@ -114,10 +126,11 @@ def weekly_trend(user_id: str = Depends(get_user_id)):
     done_by_date: dict[str, int] = {}
     rest_by_date: dict[str, int] = {}
     for r in res.data:
+        d = str(r["date"])
         if r["state"] == "done":
-            done_by_date[r["date"]] = done_by_date.get(r["date"], 0) + 1
+            done_by_date[d] = done_by_date.get(d, 0) + 1
         elif r["state"] == "rest":
-            rest_by_date[r["date"]] = rest_by_date.get(r["date"], 0) + 1
+            rest_by_date[d] = rest_by_date.get(d, 0) + 1
 
     result = []
     ws = first_monday
@@ -157,7 +170,7 @@ def weekday_avg(months: int = 3, user_id: str = Depends(get_user_id)):
     seen_dates: set[str] = set()
 
     for r in res.data:
-        d = r["date"]
+        d = str(r["date"])
         wd = date_type.fromisoformat(d).weekday()
         if r["state"] == "done":
             wd_done[wd] += 1
@@ -177,8 +190,8 @@ def weekday_avg(months: int = 3, user_id: str = Depends(get_user_id)):
 @router.delete("/month/{year}/{month}", status_code=204)
 def reset_month(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
-    prefix = f"{year:04d}-{month:02d}-"
-    db.table("records").delete().like("date", f"{prefix}%").eq("user_id", user_id).execute()
+    start, end = _month_range(year, month)
+    db.table("records").delete().gte("date", start).lte("date", end).eq("user_id", user_id).execute()
 
 
 @router.delete("/all", status_code=204)
