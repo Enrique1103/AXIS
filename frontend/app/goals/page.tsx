@@ -34,6 +34,7 @@ function GoalModal({
   const [deadline, setDeadline]     = useState(initial?.deadline ?? "")
   const [imageUrl, setImageUrl]     = useState<string | null>(initial?.image_url ?? null)
   const [uploading, setUploading]   = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedHabits, setSelected] = useState<string[]>(initial?.habit_ids ?? [])
   const [saving, setSaving]         = useState(false)
 
@@ -45,6 +46,7 @@ function GoalModal({
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
+    setUploadError(null)
     try {
       const ext = file.name.split(".").pop()
       const path = `goals/${Date.now()}.${ext}`
@@ -52,8 +54,9 @@ function GoalModal({
       if (error) throw error
       const { data } = supabase.storage.from("goal-images").getPublicUrl(path)
       setImageUrl(data.publicUrl)
-    } catch {
-      // silencioso — el usuario puede intentar de nuevo
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al subir imagen"
+      setUploadError(msg)
     } finally {
       setUploading(false)
     }
@@ -107,6 +110,9 @@ function GoalModal({
               <button onClick={() => setImageUrl(null)} className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors">
                 Eliminar imagen
               </button>
+            )}
+            {uploadError && (
+              <p className="text-[10px] text-red-400 mt-1">{uploadError}</p>
             )}
           </div>
 
