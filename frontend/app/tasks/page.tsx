@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Check, CalendarDays, X, ChevronRight, Lock, GitBranch } from "lucide-react"
+import { Plus, Trash2, Check, CalendarDays, X, ChevronRight, Lock, GitBranch, List, Network } from "lucide-react"
 import { getTasks, createTask, updateTask, deleteTask, addTaskDep, removeTaskDep } from "@/lib/api"
 import { Task } from "@/lib/types"
 import { SankeyChart } from "@/components/sankey-chart"
+import { TaskGraph } from "@/components/task-graph"
 
 type TabKey = "daily" | "weekly" | "monthly"
 
@@ -14,10 +15,12 @@ const TABS: { key: TabKey; label: string; color: string }[] = [
   { key: "monthly", label: "Mensuales", color: "text-violet-400" },
 ]
 
-const today = new Date().toISOString().slice(0, 10)
+function getToday() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 function isOverdue(task: Task) {
-  return !task.completed && !!task.deadline && task.deadline < today
+  return !task.completed && !!task.deadline && task.deadline < getToday()
 }
 
 function fmtDate(iso: string) {
@@ -43,6 +46,7 @@ function DepPickerModal({ task, allTasks, onAdd, onRemove, onClose }: {
 }) {
   const candidates = allTasks.filter(t =>
     t.id !== task.id &&
+    t.type === task.type &&
     t.parent_task_id === null &&
     !task.dep_ids.includes(t.id)
   )
@@ -275,6 +279,7 @@ function AddForm({ tab, parentId, onAdd, onCancel }: {
 
 export default function TasksPage() {
   const [tab, setTab]         = useState<TabKey>("daily")
+  const [view, setView]       = useState<"list" | "graph">("list")
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm]   = useState(false)
@@ -294,6 +299,7 @@ export default function TasksPage() {
   const pending  = roots.filter(t => !t.completed)
   const completed = roots.filter(t => t.completed)
 
+  const today = getToday()
   const sankeyData = {
     completed: allTasks.filter(t => t.completed).length,
     overdue:   allTasks.filter(t => !t.completed && !!t.deadline && t.deadline < today).length,
@@ -314,7 +320,7 @@ export default function TasksPage() {
 
   async function handleDelete(id: number) {
     await deleteTask(id)
-    setAllTasks(prev => prev.filter(t => t.id !== id && t.parent_task_id !== id))
+    await load()
   }
 
   async function handleAddDep(depId: number) {
@@ -336,7 +342,21 @@ export default function TasksPage() {
 
       {/* Header */}
       <div className="px-4 pt-4 pb-4 bg-[var(--sticky-bg)] border-b border-slate-700/40 sticky top-[128px] z-10">
-        <h1 className="text-lg font-bold mb-3">Tareas</h1>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-bold">Tareas</h1>
+          <div className="flex items-center gap-1 bg-zinc-800/60 p-1 rounded-xl">
+            <button onClick={() => setView("list")}
+              className={`p-1.5 rounded-lg transition-colors ${view === "list" ? "bg-zinc-700 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              title="Vista lista">
+              <List size={14}/>
+            </button>
+            <button onClick={() => setView("graph")}
+              className={`p-1.5 rounded-lg transition-colors ${view === "graph" ? "bg-zinc-700 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              title="Vista grafo">
+              <Network size={14}/>
+            </button>
+          </div>
+        </div>
         <div className="flex gap-1 bg-zinc-800/60 p-1 rounded-xl">
           {TABS.map(({ key, label, color }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -383,6 +403,15 @@ export default function TasksPage() {
           <div className="space-y-2">
             {[1,2,3].map(i => <div key={i} className="h-14 bg-zinc-900 rounded-xl animate-pulse"/>)}
           </div>
+        ) : view === "graph" ? (
+          <>
+            <TaskGraph tasks={roots} allTasks={allTasks}/>
+            {roots.length === 0 && (
+              <div className="text-center py-12 text-zinc-600">
+                <p className="text-sm">Sin tareas {TABS.find(t => t.key === tab)?.label.toLowerCase()}</p>
+              </div>
+            )}
+          </>
         ) : (
           <>
             {/* Pending */}

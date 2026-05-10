@@ -1,13 +1,18 @@
+import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from routers import habits, records, tasks, goals
+from routers import habits, records, tasks, goals, reminders
 
 app = FastAPI(title="Habit Tracker API")
 
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -17,7 +22,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={"Access-Control-Allow-Origin": "*"},
     )
 
 @app.exception_handler(Exception)
@@ -25,20 +29,15 @@ async def generic_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
-        headers={"Access-Control-Allow-Origin": "*"},
     )
 
 app.include_router(habits.router)
 app.include_router(records.router)
 app.include_router(tasks.router)
 app.include_router(goals.router)
+app.include_router(reminders.router)
 
 
 @app.get("/")
 def root():
     return {"status": "ok"}
-
-
-@app.get("/debug-headers")
-async def debug_headers(request: Request):
-    return dict(request.headers)

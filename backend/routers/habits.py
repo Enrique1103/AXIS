@@ -30,7 +30,7 @@ def create_habit(body: HabitCreate, user_id: str = Depends(get_user_id)):
 @router.patch("/{habit_id}")
 def update_habit(habit_id: str, body: HabitUpdate, user_id: str = Depends(get_user_id)):
     db = get_db()
-    data = body.model_dump(exclude_none=True)
+    data = body.model_dump(exclude_unset=True)
     res = db.table("habits").update(data).eq("id", habit_id).eq("user_id", user_id).execute()
     return res.data[0]
 

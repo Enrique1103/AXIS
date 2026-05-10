@@ -33,6 +33,23 @@ export interface Goal {
   habit_ids: string[]
 }
 
+export interface GoalProgress {
+  pct: number
+  perfect_days: number
+  active_days: number
+  streak_current: number
+  streak_best: number
+}
+
+export interface Reminder {
+  id: number
+  label: string
+  time: string      // "HH:MM"
+  days: number[]    // 0=Sun … 6=Sat
+  active: boolean
+  created_at: string
+}
+
 export interface Task {
   id: number
   title: string

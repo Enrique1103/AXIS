@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Pencil, Trash2, X, Check, CalendarDays, Flame, Target } from "lucide-react"
-import { getGoals, createGoal, updateGoal, deleteGoal, attachHabit, detachHabit, getHabits } from "@/lib/api"
-import { Goal, Habit } from "@/lib/types"
+import { Plus, Pencil, Trash2, X, Check, CalendarDays, Flame, Target, Trophy, ImageIcon } from "lucide-react"
+import { getGoals, createGoal, updateGoal, deleteGoal, attachHabit, detachHabit, getHabits, getGoalProgress } from "@/lib/api"
+import { Goal, Habit, GoalProgress } from "@/lib/types"
+import { supabase } from "@/lib/supabase"
 
 function fmtDate(iso: string) {
   const [y, m, d] = iso.split("-")
@@ -31,11 +32,31 @@ function GoalModal({
   const [description, setDesc]      = useState(initial?.description ?? "")
   const [commitment, setCommitment] = useState(initial?.commitment ?? "")
   const [deadline, setDeadline]     = useState(initial?.deadline ?? "")
+  const [imageUrl, setImageUrl]     = useState<string | null>(initial?.image_url ?? null)
+  const [uploading, setUploading]   = useState(false)
   const [selectedHabits, setSelected] = useState<string[]>(initial?.habit_ids ?? [])
   const [saving, setSaving]         = useState(false)
 
   function toggleHabit(id: string) {
     setSelected(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id])
+  }
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const ext = file.name.split(".").pop()
+      const path = `goals/${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from("goal-images").upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from("goal-images").getPublicUrl(path)
+      setImageUrl(data.publicUrl)
+    } catch {
+      // silencioso — el usuario puede intentar de nuevo
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function handleSave() {
@@ -47,7 +68,7 @@ function GoalModal({
         description: description.trim() || null,
         commitment: commitment.trim() || null,
         deadline: deadline || null,
-        image_url: initial?.image_url ?? null,
+        image_url: imageUrl,
       }, selectedHabits)
       onClose()
     } finally { setSaving(false) }
@@ -62,6 +83,33 @@ function GoalModal({
         </div>
 
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+
+          {/* Imagen */}
+          <div className="space-y-1">
+            <label className="text-xs text-zinc-400 flex items-center gap-1"><ImageIcon size={11}/> Imagen (opcional)</label>
+            <label className={`flex items-center gap-3 cursor-pointer w-full rounded-xl border border-dashed transition-colors
+              ${uploading ? "border-zinc-600 opacity-60" : "border-zinc-700 hover:border-green-500/50"}`}>
+              {imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl} alt="meta" className="w-16 h-16 object-cover rounded-xl shrink-0"/>
+              ) : (
+                <div className="w-16 h-16 bg-zinc-800 rounded-xl flex items-center justify-center shrink-0">
+                  <ImageIcon size={20} className="text-zinc-600"/>
+                </div>
+              )}
+              <div className="flex-1 py-3 pr-3">
+                <p className="text-xs text-zinc-400">{uploading ? "Subiendo…" : imageUrl ? "Cambiar imagen" : "Seleccionar imagen"}</p>
+                <p className="text-[10px] text-zinc-600 mt-0.5">JPG, PNG, WebP</p>
+              </div>
+              <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} disabled={uploading}/>
+            </label>
+            {imageUrl && (
+              <button onClick={() => setImageUrl(null)} className="text-[10px] text-zinc-600 hover:text-red-400 transition-colors">
+                Eliminar imagen
+              </button>
+            )}
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs text-zinc-400">Título *</label>
             <input value={title} onChange={e => setTitle(e.target.value)}
@@ -131,12 +179,47 @@ function GoalCard({ goal, habits, onEdit, onDelete }: {
   onEdit: () => void
   onDelete: () => void
 }) {
+  const [progress, setProgress] = useState<GoalProgress | null>(null)
+
+  useEffect(() => {
+    if (goal.habit_ids.length > 0) {
+      getGoalProgress(goal.id).then(setProgress).catch(() => {})
+    }
+  }, [goal.id, goal.habit_ids.length])
+
   const linked = habits.filter(h => goal.habit_ids.includes(h.id))
   const dl = goal.deadline ? daysLeft(goal.deadline) : null
   const isOverdue = dl?.color === "text-red-400"
 
+  const pct = progress?.pct ?? 0
+  const streakCurrent = progress?.streak_current ?? 0
+
+  // Sistema llama/ceniza
+  const flameLevel =
+    streakCurrent >= 7  ? "high"   :
+    streakCurrent >= 3  ? "medium" :
+    streakCurrent >= 1  ? "low"    : "none"
+
+  const flameCfg = {
+    high:   { color: "text-orange-400", glow: "shadow-orange-500/40", label: `🔥 ${streakCurrent}d racha` },
+    medium: { color: "text-amber-400",  glow: "shadow-amber-500/30",  label: `🔥 ${streakCurrent}d racha` },
+    low:    { color: "text-yellow-500", glow: "",                      label: `🔥 ${streakCurrent}d racha` },
+    none:   { color: "text-zinc-600",   glow: "",                      label: "" },
+  }[flameLevel]
+
+  const barColor =
+    pct >= 80 ? "#22c55e" :
+    pct >= 50 ? "#eab308" : "#ef4444"
+
   return (
     <div className={`gc rounded-2xl overflow-hidden transition-all ${isOverdue ? "!border-red-500/30" : ""}`}>
+
+      {/* Imagen de portada */}
+      {goal.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={goal.image_url} alt={goal.title} className="w-full h-32 object-cover"/>
+      )}
+
       <div className="p-4 space-y-3">
 
         {/* Header */}
@@ -146,6 +229,9 @@ function GoalCard({ goal, habits, onEdit, onDelete }: {
             <h3 className="font-semibold text-zinc-100 truncate">{goal.title}</h3>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {flameLevel !== "none" && (
+              <span className={`text-xs font-semibold ${flameCfg.color}`}>{flameCfg.label}</span>
+            )}
             <button onClick={onEdit} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
               <Pencil size={13}/>
             </button>
@@ -158,6 +244,34 @@ function GoalCard({ goal, habits, onEdit, onDelete }: {
         {/* Description */}
         {goal.description && (
           <p className="text-sm text-zinc-400 leading-snug">{goal.description}</p>
+        )}
+
+        {/* Progreso */}
+        {goal.habit_ids.length > 0 && progress && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-500">Progreso</span>
+              <div className="flex items-center gap-2">
+                {progress.streak_best > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] text-zinc-600">
+                    <Trophy size={9}/> mejor {progress.streak_best}d
+                  </span>
+                )}
+                <span className="text-xs font-semibold tabular-nums" style={{ color: barColor }}>
+                  {pct}%
+                </span>
+              </div>
+            </div>
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${pct}%`, backgroundColor: barColor }}
+              />
+            </div>
+            <p className="text-[10px] text-zinc-600">
+              {progress.perfect_days} días perfectos de {progress.active_days} activos
+            </p>
+          </div>
         )}
 
         {/* Commitment */}

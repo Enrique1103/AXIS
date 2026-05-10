@@ -15,10 +15,18 @@ def get_tasks(type: Optional[str] = None, user_id: str = Depends(get_user_id)):
         q = q.eq("type", type)
     tasks = q.execute().data
 
-    deps = db.table("task_deps").select("task_id, depends_on_task_id").execute().data
     deps_map: dict[int, list[int]] = {}
-    for d in deps:
-        deps_map.setdefault(d["task_id"], []).append(d["depends_on_task_id"])
+    task_ids = [t["id"] for t in tasks]
+    if task_ids:
+        deps = (
+            db.table("task_deps")
+            .select("task_id, depends_on_task_id")
+            .in_("task_id", task_ids)
+            .execute()
+            .data
+        )
+        for d in deps:
+            deps_map.setdefault(d["task_id"], []).append(d["depends_on_task_id"])
 
     for task in tasks:
         task["dep_ids"] = deps_map.get(task["id"], [])
@@ -45,9 +53,17 @@ def create_task(body: TaskCreate, user_id: str = Depends(get_user_id)):
 @router.patch("/{task_id}")
 def update_task(task_id: int, body: TaskUpdate, user_id: str = Depends(get_user_id)):
     db = get_db()
-    data = {k: v for k, v in body.model_dump().items() if v is not None}
-    res = db.table("tasks").update(data).eq("id", task_id).eq("user_id", user_id).execute()
-    task = res.data[0]
+    data = body.model_dump(exclude_unset=True)
+    if data:
+        db.table("tasks").update(data).eq("id", task_id).eq("user_id", user_id).execute()
+    task = (
+        db.table("tasks")
+        .select("*")
+        .eq("id", task_id)
+        .eq("user_id", user_id)
+        .execute()
+        .data[0]
+    )
     deps = db.table("task_deps").select("depends_on_task_id").eq("task_id", task_id).execute().data
     task["dep_ids"] = [d["depends_on_task_id"] for d in deps]
     return task
@@ -56,7 +72,14 @@ def update_task(task_id: int, body: TaskUpdate, user_id: str = Depends(get_user_
 @router.delete("/{task_id}", status_code=204)
 def delete_task(task_id: int, user_id: str = Depends(get_user_id)):
     db = get_db()
-    db.table("tasks").delete().eq("id", task_id).eq("user_id", user_id).execute()
+    owned = db.table("tasks").select("id").eq("id", task_id).eq("user_id", user_id).execute()
+    if not owned.data:
+        return
+    subtasks = db.table("tasks").select("id").eq("parent_task_id", task_id).execute().data
+    all_ids = [task_id] + [s["id"] for s in subtasks]
+    db.table("task_deps").delete().in_("task_id", all_ids).execute()
+    db.table("task_deps").delete().in_("depends_on_task_id", all_ids).execute()
+    db.table("tasks").delete().in_("id", all_ids).eq("user_id", user_id).execute()
 
 
 @router.post("/{task_id}/deps/{dep_id}", status_code=201)

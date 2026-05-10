@@ -1,16 +1,17 @@
-import { Habit, DayRecords, MonthSummary, HabitMonthStats, Task, Goal } from "./types"
+import { Habit, DayRecords, MonthSummary, HabitMonthStats, Task, Goal, GoalProgress, Reminder } from "./types"
 import { supabase } from "./supabase"
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
-async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  let { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    const refreshed = await supabase.auth.refreshSession()
-    session = refreshed.data.session
-  }
-  const token = session?.access_token
-  console.log("[API] session:", session ? "ok" : "null", "| token:", token ? token.slice(0, 30) + "..." : "MISSING")
+async function getToken(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) return session.access_token
+  const { data } = await supabase.auth.refreshSession()
+  return data.session?.access_token ?? null
+}
+
+async function req<T>(path: string, options?: RequestInit, retry = true): Promise<T> {
+  const token = await getToken()
 
   const res = await fetch(`${BASE}${path}`, {
     headers: {
@@ -19,6 +20,12 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
     },
     ...options,
   })
+
+  if (res.status === 401 && retry) {
+    await supabase.auth.refreshSession()
+    return req<T>(path, options, false)
+  }
+
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
   if (res.status === 204) return undefined as T
   return res.json()
@@ -92,6 +99,9 @@ export const attachHabit = (goalId: number, habitId: string): Promise<void> =>
 export const detachHabit = (goalId: number, habitId: string): Promise<void> =>
   req(`/goals/${goalId}/habits/${habitId}`, { method: "DELETE" })
 
+export const getGoalProgress = (goalId: number): Promise<GoalProgress> =>
+  req(`/goals/${goalId}/progress`)
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 export const getTasks = (type?: string): Promise<Task[]> =>
@@ -111,3 +121,17 @@ export const addTaskDep = (taskId: number, depId: number): Promise<void> =>
 
 export const removeTaskDep = (taskId: number, depId: number): Promise<void> =>
   req(`/tasks/${taskId}/deps/${depId}`, { method: "DELETE" })
+
+// ── Reminders ─────────────────────────────────────────────────────────────────
+
+export const getReminders = (): Promise<Reminder[]> =>
+  req("/reminders")
+
+export const createReminder = (data: Omit<Reminder, "id" | "created_at">): Promise<Reminder> =>
+  req("/reminders", { method: "POST", body: JSON.stringify(data) })
+
+export const updateReminder = (id: number, data: Partial<Omit<Reminder, "id" | "created_at">>): Promise<Reminder> =>
+  req(`/reminders/${id}`, { method: "PATCH", body: JSON.stringify(data) })
+
+export const deleteReminder = (id: number): Promise<void> =>
+  req(`/reminders/${id}`, { method: "DELETE" })

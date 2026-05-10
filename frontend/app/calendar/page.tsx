@@ -134,17 +134,22 @@ export default function CalendarPage() {
               </button>
             </div>
             <div className="space-y-2">
-              {detail.habits.map(h => (
-                <div key={h.id} className="flex items-center gap-3 text-sm">
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold
-                    ${detail.records[h.id] ? "bg-green-500 text-white" : "bg-zinc-700 text-zinc-400"}`}>
-                    {detail.records[h.id] ? "✓" : "✗"}
-                  </span>
-                  <span className={detail.records[h.id] ? "text-zinc-200" : "text-zinc-500"}>
-                    {h.name}
-                  </span>
-                </div>
-              ))}
+              {detail.habits.map(h => {
+                const state = detail.records[h.id]
+                const cfg =
+                  state === "done"   ? { bg: "bg-green-500",  label: "✓", text: "text-zinc-200" } :
+                  state === "rest"   ? { bg: "bg-zinc-500",   label: "−", text: "text-zinc-400" } :
+                  state === "failed" ? { bg: "bg-red-500",    label: "✗", text: "text-zinc-400" } :
+                                       { bg: "bg-zinc-800",   label: "·", text: "text-zinc-500" }
+                return (
+                  <div key={h.id} className="flex items-center gap-3 text-sm">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${cfg.bg}`}>
+                      {cfg.label}
+                    </span>
+                    <span className={cfg.text}>{h.name}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
