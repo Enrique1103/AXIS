@@ -61,14 +61,14 @@ export default function TopNav() {
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap
+                className={`flex items-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap
                   ${active
                     ? "bg-green-500/15 text-green-400 border border-green-500/25"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                   }`}
               >
                 <Icon size={14} strokeWidth={active ? 2.5 : 1.8} />
-                {label}
+                <span className="hidden sm:inline">{label}</span>
               </Link>
             )
           })}

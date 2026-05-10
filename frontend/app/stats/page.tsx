@@ -1,83 +1,112 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight, Flame, Trophy, Star, TrendingUp, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Flame } from "lucide-react"
 import {
   getHabits, getMonthSummary, getMonthByHabit,
-  getDayRecords, getWeeklyTrend, getWeekdayAvg,
+  getMonthAll, getWeekdayAvg, getMonthlyTrend, getTasks,
 } from "@/lib/api"
-import { Habit, MonthSummary, HabitMonthStats, DayRecords } from "@/lib/types"
-import { MONTHS, DAYS_SHORT, daysInMonth, firstWeekdayOffset, streak, toISODate } from "@/lib/utils"
+import { Habit, Task } from "@/lib/types"
+import { MONTHS, daysInMonth, streak } from "@/lib/utils"
 import { TrendChart } from "@/components/trend-chart"
 import { WeekdayChart } from "@/components/weekday-chart"
+import { MonthlyEKGChart } from "@/components/monthly-ekg-chart"
 
-interface DayDetail { day: number; records: DayRecords }
+type RecordMatrix = Record<string, Record<string, string>>
+
+// ── 10 estados FÉNIX ─────────────────────────────────────────────────────────
+
+const FENIX_STATES = [
+  { min: 95, emoji: "🌟", label: "FÉNIX pleno",           color: "#fb923c" },
+  { min: 85, emoji: "🔥", label: "Fuego intenso",         color: "#ef4444" },
+  { min: 75, emoji: "🔥", label: "Fuego vivo",            color: "#f97316" },
+  { min: 65, emoji: "🔥", label: "Fueguito",              color: "#f97316" },
+  { min: 55, emoji: "✨", label: "Brasa encendida",       color: "#eab308" },
+  { min: 45, emoji: "✨", label: "Primera chispa",        color: "#ca8a04" },
+  { min: 35, emoji: "💫", label: "Cenizas encendiéndose", color: "#a3a3a3" },
+  { min: 25, emoji: "🌫️", label: "Cenizas con humo",     color: "#71717a" },
+  { min: 10, emoji: "⚫", label: "Cenizas frías",         color: "#52525b" },
+  { min: 0,  emoji: "💨", label: "Solo humo",             color: "#3f3f46" },
+]
+
+function getFenixState(pct: number) {
+  return FENIX_STATES.find(s => pct >= s.min) ?? FENIX_STATES[FENIX_STATES.length - 1]
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  const now = new Date()
-  const [year, setYear]     = useState(now.getFullYear())
-  const [month, setMonth]   = useState(now.getMonth() + 1)
-  const [habits, setHabits] = useState<Habit[]>([])
-  const [summary, setSummary]         = useState<MonthSummary>({})
-  const [prevSummary, setPrevSummary] = useState<MonthSummary>({})
-  const [habitStats, setHabitStats]   = useState<HabitMonthStats>({})
-  const [trend, setTrend]             = useState<{ label: string; pct: number }[]>([])
-  const [weekdayAvg, setWeekdayAvg]   = useState<Record<string, number>>({})
-  const [loading, setLoading]         = useState(true)
-  const [detail, setDetail]           = useState<DayDetail | null>(null)
+  const now   = new Date()
+  const today = now.toISOString().slice(0, 10)
 
-  // Trend se carga una sola vez (no depende del mes)
+  const [year, setYear]   = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+
+  const [habits, setHabits]           = useState<Habit[]>([])
+  const [summary, setSummary]         = useState<Record<string, number>>({})
+  const [habitStats, setHabitStats]   = useState<Record<string, number>>({})
+  const [weekdayAvg, setWeekdayAvg]   = useState<Record<string, number>>({})
+  const [matrix, setMatrix]           = useState<RecordMatrix>({})
+  const [monthlyTrend, setMonthlyTrend] = useState<{ label: string; pct: number }[]>([])
+  const [tasks, setTasks]             = useState<Task[]>([])
+  const [loading, setLoading]         = useState(true)
+
+  // Carga global — una sola vez
   useEffect(() => {
-    getWeeklyTrend().then(setTrend)
+    getMonthlyTrend().then(setMonthlyTrend)
+    getTasks().then(setTasks)
   }, [])
 
+  // Carga mensual — se actualiza al cambiar mes
   useEffect(() => {
     setLoading(true)
-    const prevM = month === 1 ? 12 : month - 1
-    const prevY = month === 1 ? year - 1 : year
     Promise.all([
       getHabits(),
       getMonthSummary(year, month),
-      getMonthSummary(prevY, prevM),
       getMonthByHabit(year, month),
       getWeekdayAvg(3),
-    ]).then(([h, s, ps, hs, wd]) => {
-      setHabits(h); setSummary(s); setPrevSummary(ps)
-      setHabitStats(hs); setWeekdayAvg(wd)
+      getMonthAll(year, month),
+    ]).then(([h, s, hs, wd, monthAll]) => {
+      setHabits(h)
+      setSummary(s)
+      setHabitStats(hs)
+      setWeekdayAvg(wd)
+      const m: RecordMatrix = {}
+      for (const r of monthAll) {
+        if (!m[r.date]) m[r.date] = {}
+        m[r.date][String(r.habit_id)] = r.state
+      }
+      setMatrix(m)
       setLoading(false)
     })
   }, [year, month])
 
-  function prevMonth() { month === 1 ? (setMonth(12), setYear(y=>y-1)) : setMonth(m=>m-1) }
-  function nextMonth() { month === 12 ? (setMonth(1), setYear(y=>y+1)) : setMonth(m=>m+1) }
+  function prevMonth() { month === 1 ? (setMonth(12), setYear(y => y - 1)) : setMonth(m => m - 1) }
+  function nextMonth() { month === 12 ? (setMonth(1), setYear(y => y + 1)) : setMonth(m => m + 1) }
 
-  async function openDay(day: number) {
-    const ds = toISODate(new Date(year, month-1, day))
-    const r = await getDayRecords(ds)
-    setDetail({ day, records: r })
-  }
-
+  // ── Métricas ──
   const days        = daysInMonth(year, month)
   const total       = habits.length
+  const totalDone   = Object.values(summary).reduce((a, b) => a + b, 0)
   const maxPossible = total * days
-  const totalDone   = Object.values(summary).reduce((a,b)=>a+b,0)
   const monthPct    = maxPossible ? Math.round(totalDone / maxPossible * 100) : 0
-  const { current, best } = streak(summary, total, year, month)
-
+  const { current: currentStreak, best: bestStreak } = streak(summary, total, year, month)
   const perfectDays = total > 0 ? Object.values(summary).filter(c => c >= total).length : 0
 
-  const prevDays = daysInMonth(month === 1 ? year-1 : year, month === 1 ? 12 : month-1)
-  const prevDone = Object.values(prevSummary).reduce((a,b)=>a+b,0)
-  const prevPct  = total * prevDays ? Math.round(prevDone / (total * prevDays) * 100) : 0
-  const diffPct  = monthPct - prevPct
+  const habitPcts  = habits.map(h => ({ name: h.name, pct: days ? Math.round((habitStats[h.id] ?? 0) / days * 100) : 0 }))
+  const bestHabit  = habitPcts.length ? habitPcts.reduce((a, b) => a.pct >= b.pct ? a : b) : null
+  const worstHabit = habitPcts.length ? habitPcts.reduce((a, b) => a.pct <= b.pct ? a : b) : null
 
-  const habitPcts  = habits.map(h => ({ name: h.name, pct: days ? Math.round((habitStats[h.id]??0)/days*100) : 0 }))
-  const bestHabit  = habitPcts.length ? habitPcts.reduce((a,b) => a.pct>=b.pct ? a : b) : null
-  const worstHabit = habitPcts.length ? habitPcts.reduce((a,b) => a.pct<=b.pct ? a : b) : null
-
-  const wdValues  = Array.from({length:7}, (_,i) => weekdayAvg[String(i)]??0)
+  const wdValues  = Array.from({ length: 7 }, (_, i) => weekdayAvg[String(i)] ?? 0)
   const bestWdIdx = wdValues.indexOf(Math.max(...wdValues))
-  const DAYS_FULL = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+  const DAYS_FULL = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+  // Eficiencia de tareas (todas, no solo del mes)
+  const totalTasks     = tasks.length
+  const completedTasks = tasks.filter(t => t.completed).length
+  const taskEff        = totalTasks > 0 ? Math.round(completedTasks / totalTasks * 100) : null
+
+  const fenix = getFenixState(monthPct)
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-24">
@@ -88,7 +117,7 @@ export default function StatsPage() {
         <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-zinc-800 transition-colors">
           <ChevronLeft size={20}/>
         </button>
-        <h2 className="text-lg font-bold tracking-tight">{MONTHS[month-1]} {year}</h2>
+        <h2 className="text-lg font-bold tracking-tight">{MONTHS[month - 1]} {year}</h2>
         <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-zinc-800 transition-colors">
           <ChevronRight size={20}/>
         </button>
@@ -96,202 +125,146 @@ export default function StatsPage() {
 
       <div className="p-4 space-y-4">
 
-        {/* ── 1. Tendencia semanal — siempre visible ── */}
-        <div className="gc p-4">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
-              Tendencia semanal
-            </p>
-            <span className="text-xs text-zinc-600">desde el inicio</span>
+        {/* ── Tendencia histórica mes a mes ── */}
+        {monthlyTrend.length >= 2 && (
+          <div className="gc p-4">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                Tendencia histórica
+              </p>
+              <span className="text-[10px] text-zinc-600">{monthlyTrend.length} meses</span>
+            </div>
+            <p className="text-xs text-zinc-600 mb-3">% completado por mes</p>
+            <TrendChart data={monthlyTrend} showAllLabels/>
           </div>
-          <TrendChart data={trend}/>
-        </div>
+        )}
+
+        {/* ── EKG del mes seleccionado ── */}
+        {!loading && habits.length > 0 && (
+          <div className="gc p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                {MONTHS[month - 1]} {year} · día a día
+              </p>
+              <span className="text-[10px] font-bold" style={{ color: fenix.color }}>{monthPct}%</span>
+            </div>
+            <MonthlyEKGChart
+              matrix={matrix as any}
+              habitCount={total}
+              year={year}
+              month={month}
+              todayStr={today}
+            />
+          </div>
+        )}
 
         {loading ? (
-          <div className="space-y-4">
-            {[1,2,3].map(i=>(
-              <div key={i} className="h-32 bg-zinc-900 rounded-2xl animate-pulse"/>
-            ))}
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => <div key={i} className="h-24 bg-zinc-900 rounded-2xl animate-pulse"/>)}
           </div>
         ) : (
           <>
-            {/* ── 2. Cards de resumen ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MiniCard icon={<Flame size={18} className="text-orange-400"/>}
-                bg="bg-orange-500/10" color="text-orange-400"
-                value={current} label="Racha actual"/>
-              <MiniCard icon={<Trophy size={18} className="text-yellow-400"/>}
-                bg="bg-yellow-500/10" color="text-yellow-400"
-                value={best} label="Mejor racha"/>
-              <MiniCard icon={<Star size={18} className="text-green-400"/>}
-                bg="bg-green-500/10" color="text-green-400"
-                value={perfectDays} label="Días perfectos"/>
-              <MiniCard
-                icon={<TrendingUp size={18} className={diffPct>=0?"text-blue-400":"text-red-400"}/>}
-                bg={diffPct>=0?"bg-blue-500/10":"bg-red-500/10"}
-                color={diffPct>=0?"text-blue-400":"text-red-400"}
-                value={`${diffPct>=0?"+":""}${diffPct}%`}
-                label="vs mes anterior"/>
-            </div>
+            {/* ── Estado FÉNIX + Eficiencia ── */}
+            <div className="grid grid-cols-2 gap-3">
 
-            {/* ── 3. Progreso del mes + Hábitos destacados ── */}
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Progreso */}
+              {/* Estado */}
               <div className="gc p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
-                    Progreso del mes
-                  </p>
-                  <span className="text-3xl font-bold tabular-nums">
-                    {monthPct}<span className="text-sm text-zinc-500 font-normal">%</span>
-                  </span>
-                </div>
-                <div className="h-2.5 bg-slate-800/80 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-700"
-                    style={{width:`${monthPct}%`, background:"linear-gradient(90deg,#34d399,#22d3ee)"}}/>
-                </div>
-                <p className="text-xs text-zinc-600 mt-2">{totalDone} de {maxPossible} completados</p>
-
-                {/* Mejor día */}
-                {wdValues.some(v=>v>0) && (
-                  <div className="mt-4 pt-4 border-t border-slate-700/40 flex justify-between items-center">
-                    <div>
-                      <p className="text-xs text-zinc-500 uppercase tracking-widest">Mejor día</p>
-                      <p className="text-green-400 font-semibold mt-0.5">{DAYS_FULL[bestWdIdx]}</p>
-                    </div>
-                    <p className="text-xs text-zinc-600">últ. 3 meses</p>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Estado</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl leading-none">{fenix.emoji}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold leading-snug" style={{ color: fenix.color }}>
+                      {fenix.label}
+                    </p>
+                    <p className="text-[10px] text-zinc-600 mt-0.5">{monthPct}% este mes</p>
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Mejor / peor hábito */}
-              {bestHabit && worstHabit && bestHabit.name !== worstHabit.name ? (
+              {/* Eficiencia o racha */}
+              {taskEff !== null ? (
                 <div className="gc p-4">
-                  <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-4">
-                    Hábitos destacados
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Eficiencia</p>
+                  <p className={`text-3xl font-bold tabular-nums leading-none
+                    ${taskEff >= 70 ? "text-green-400" : taskEff >= 40 ? "text-yellow-400" : "text-red-400"}`}>
+                    {taskEff}%
                   </p>
-                  {[
-                    { arrow:"↑ Mejor", color:"text-green-400",  barColor:"#22c55e", ...bestHabit },
-                    { arrow:"↓ Difícil", color:"text-red-400", barColor:"#ef4444", ...worstHabit },
-                  ].map(({arrow, color, barColor, name, pct}) => (
-                    <div key={arrow} className="mb-4 last:mb-0">
-                      <div className="flex justify-between items-center mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold ${color}`}>{arrow}</span>
-                          <span className="text-sm text-zinc-200 truncate max-w-[140px]">{name}</span>
-                        </div>
-                        <span className="text-xs text-zinc-500 tabular-nums">{pct}%</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-800/70 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full"
-                          style={{width:`${pct}%`, backgroundColor:barColor}}/>
-                      </div>
-                    </div>
-                  ))}
+                  <p className="text-[10px] text-zinc-600 mt-1">{completedTasks}/{totalTasks} tareas</p>
                 </div>
               ) : (
-                <div className="gc p-4 flex items-center justify-center">
-                  <p className="text-xs text-zinc-600">Agrega más hábitos para ver comparativas</p>
+                <div className="gc p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Racha</p>
+                  <div className="flex items-center gap-1.5">
+                    <Flame size={18} className={currentStreak > 0 ? "text-amber-400" : "text-zinc-600"}/>
+                    <p className={`text-3xl font-bold tabular-nums leading-none
+                      ${currentStreak > 0 ? "text-amber-400" : "text-zinc-500"}`}>
+                      {currentStreak}
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 mt-1">días consecutivos</p>
                 </div>
               )}
             </div>
 
-            {/* ── 4. Por día de semana + Por hábito ── */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="gc p-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-4">
-                  Por día de la semana
+            {/* ── 3 mini stats ── */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="gc p-3 text-center">
+                <p className={`text-xl font-bold tabular-nums ${currentStreak > 0 ? "text-amber-400" : "text-zinc-500"}`}>
+                  {currentStreak}
                 </p>
-                <WeekdayChart data={weekdayAvg}/>
-                <p className="text-xs text-zinc-600 mt-3 text-center">Promedio últimos 3 meses</p>
+                <p className="text-[10px] text-zinc-500 mt-1">Racha</p>
               </div>
-
-              <div className="gc p-4">
-                <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-4">
-                  Por hábito este mes
-                </p>
-                <div className="space-y-4">
-                  {habits.map(h => {
-                    const done = habitStats[h.id] ?? 0
-                    const pct  = days ? Math.round(done / days * 100) : 0
-                    const bc   = pct >= 80 ? "#22c55e" : pct >= 50 ? "#eab308" : "#ef4444"
-                    return (
-                      <div key={h.id}>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-sm text-zinc-200 truncate pr-2">{h.name}</span>
-                          <span className="text-xs text-zinc-500 tabular-nums shrink-0">
-                            {done}/{days} · {pct}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-slate-800/70 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500"
-                            style={{width:`${pct}%`, backgroundColor:bc}}/>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+              <div className="gc p-3 text-center">
+                <p className="text-xl font-bold tabular-nums text-green-400">{perfectDays}</p>
+                <p className="text-[10px] text-zinc-500 mt-1">Días perfectos</p>
+              </div>
+              <div className="gc p-3 text-center">
+                <p className="text-xl font-bold tabular-nums text-blue-400">{bestStreak}</p>
+                <p className="text-[10px] text-zinc-500 mt-1">Mejor racha</p>
               </div>
             </div>
+
+            {/* ── Por día de semana ── */}
+            {wdValues.some(v => v > 0) && (
+              <div className="gc p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Por día de semana
+                  </p>
+                  <span className="text-xs text-green-400 font-medium">{DAYS_FULL[bestWdIdx]}</span>
+                </div>
+                <WeekdayChart data={weekdayAvg}/>
+                <p className="text-[10px] text-zinc-600 mt-2 text-center">Promedio últimos 3 meses</p>
+              </div>
+            )}
+
+            {/* ── Hábitos destacados ── */}
+            {bestHabit && worstHabit && bestHabit.name !== worstHabit.name && (
+              <div className="gc p-4">
+                <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500 mb-4">
+                  Hábitos
+                </p>
+                {[
+                  { arrow: "↑ Mejor",   color: "text-green-400", barColor: "#22c55e", ...bestHabit },
+                  { arrow: "↓ Difícil", color: "text-red-400",   barColor: "#ef4444", ...worstHabit },
+                ].map(({ arrow, color, barColor, name, pct }) => (
+                  <div key={arrow} className="mb-4 last:mb-0">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${color}`}>{arrow}</span>
+                        <span className="text-sm text-zinc-200 truncate max-w-[140px]">{name}</span>
+                      </div>
+                      <span className="text-xs text-zinc-500 tabular-nums">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-800/70 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: barColor }}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
-      </div>
-
-      {/* Modal día */}
-      {detail && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end md:items-center justify-center z-50 px-4"
-          onClick={()=>setDetail(null)}>
-          <div className="gc w-full max-w-sm rounded-t-3xl md:rounded-2xl p-5 pb-8"
-            onClick={e=>e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">{detail.day} de {MONTHS[month-1]}</h3>
-              <button onClick={()=>setDetail(null)}
-                className="p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
-                <X size={16}/>
-              </button>
-            </div>
-            <div className="space-y-2.5">
-              {habits.map(h => {
-                const state = detail.records[h.id]
-                const cfg =
-                  state === 'done'   ? { bg: "bg-green-500",  label: "✓", text: "text-zinc-100" } :
-                  state === 'rest'   ? { bg: "bg-zinc-500",   label: "−", text: "text-zinc-400" } :
-                  state === 'failed' ? { bg: "bg-red-500",    label: "✗", text: "text-zinc-400" } :
-                                       { bg: "bg-zinc-800",   label: "·", text: "text-zinc-500" }
-                return (
-                  <div key={h.id} className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 text-white ${cfg.bg}`}>
-                      {cfg.label}
-                    </span>
-                    <span className={`text-sm ${cfg.text}`}>{h.name}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Mini stat card ─────────────────────────────────────────────────────────────
-
-function MiniCard({ icon, bg, color, value, label }: {
-  icon: React.ReactNode
-  bg: string
-  color: string
-  value: number | string
-  label: string
-}) {
-  return (
-    <div className="gc p-4 flex items-center gap-3">
-      <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
-        <p className="text-[11px] text-zinc-500 leading-tight mt-0.5">{label}</p>
       </div>
     </div>
   )

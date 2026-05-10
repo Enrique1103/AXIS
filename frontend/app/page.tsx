@@ -409,37 +409,7 @@ export default function HabitTrackerPage() {
         </div>
       )}
 
-      {/* ── Bottom insights ── */}
-      {!loading && habits.length > 0 && (
-        <div className="px-4 pt-2 pb-10 space-y-3">
-
-
-          {/* Mini bars por hábito */}
-          <div className="gc p-4">
-            <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
-              Progreso del mes · {MONTHS[month - 1]}
-            </p>
-            <div className="space-y-3">
-              {habitPcts.map(({ id, name, pct }) => {
-                const color = pct >= 80 ? "#22c55e" : pct >= 50 ? "#eab308" : "#ef4444"
-                return (
-                  <div key={id}>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs text-zinc-300 truncate pr-2">{name}</span>
-                      <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{pct}%</span>
-                    </div>
-                    <div className="h-1.5 bg-zinc-800/80 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: color }}/>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-        </div>
-      )}
+      <div className="pb-10"/>
     </div>
   )
 }

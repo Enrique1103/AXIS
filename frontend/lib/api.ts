@@ -59,6 +59,9 @@ export const getMonthByHabit = (year: number, month: number): Promise<HabitMonth
 export const getWeeklyTrend = (): Promise<{ week_start: string; label: string; pct: number }[]> =>
   req(`/records/weekly-trend`)
 
+export const getMonthlyTrend = (): Promise<{ label: string; pct: number }[]> =>
+  req(`/records/monthly-trend`)
+
 export const getWeekdayAvg = (months = 3): Promise<Record<string, number>> =>
   req(`/records/weekday-avg?months=${months}`)
 

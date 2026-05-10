@@ -14,7 +14,7 @@ function yPos(pct: number) {
   return PAD_TOP + PLOT_H * (1 - pct / 100)
 }
 
-export function TrendChart({ data }: { data: Point[] }) {
+export function TrendChart({ data, showAllLabels = false }: { data: Point[]; showAllLabels?: boolean }) {
   if (!data.length) return (
     <p className="text-xs text-zinc-600 text-center py-8">Sin datos aún</p>
   )
@@ -32,9 +32,8 @@ export function TrendChart({ data }: { data: Point[] }) {
   const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ")
   const areaPath = `${linePath} L${pts[pts.length-1].x},${BASELINE} L${pts[0].x},${BASELINE} Z`
 
-  // Etiqueta X sólo cuando cambia el mes  (o en el primer punto)
   function showLabel(i: number) {
-    if (i === 0) return true
+    if (i === 0 || showAllLabels) return true
     return data[i].label.split("/")[1] !== data[i-1].label.split("/")[1]
   }
 

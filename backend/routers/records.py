@@ -187,6 +187,54 @@ def weekday_avg(months: int = 3, user_id: str = Depends(get_user_id)):
     }
 
 
+MONTHS_ES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+
+
+@router.get("/monthly-trend")
+def monthly_trend(user_id: str = Depends(get_user_id)):
+    db = get_db()
+    habits_res = db.table("habits").select("id").eq("user_id", user_id).eq("active", True).execute()
+    habit_count = len(habits_res.data)
+    if habit_count == 0:
+        return []
+
+    first_res = db.table("records").select("date").eq("user_id", user_id).order("date").limit(1).execute()
+    if not first_res.data:
+        return []
+
+    first_date = date_type.fromisoformat(str(first_res.data[0]["date"]))
+    today = date_type.today()
+
+    result = []
+    y, m = first_date.year, first_date.month
+
+    while (y, m) <= (today.year, today.month):
+        start, end = _month_range(y, m)
+        cap = str(today) if (y, m) == (today.year, today.month) else end
+
+        res = (db.table("records")
+               .select("state")
+               .gte("date", start)
+               .lte("date", cap)
+               .eq("user_id", user_id)
+               .execute())
+
+        done = sum(1 for r in res.data if r["state"] == "done")
+        rest = sum(1 for r in res.data if r["state"] == "rest")
+        days_elapsed = today.day if (y, m) == (today.year, today.month) else calendar.monthrange(y, m)[1]
+        total = days_elapsed * habit_count - rest
+        pct = round(done / total * 100, 1) if total > 0 else 0
+
+        result.append({"label": f"{MONTHS_ES[m - 1]} {str(y)[2:]}", "pct": pct})
+
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+    return result
+
+
 @router.delete("/month/{year}/{month}", status_code=204)
 def reset_month(year: int, month: int, user_id: str = Depends(get_user_id)):
     db = get_db()
