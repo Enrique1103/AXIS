@@ -14,7 +14,7 @@ class HabitUpdate(BaseModel):
 
 class RecordSet(BaseModel):
     date: str
-    habit_id: int
+    habit_id: str
     state: Optional[str] = None  # 'done' | 'rest' | 'failed' | None = borrar
 
 

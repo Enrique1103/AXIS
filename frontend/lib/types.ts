@@ -1,5 +1,5 @@
 export interface Habit {
-  id: number
+  id: string
   name: string
   icon: string
   color: string
@@ -11,7 +11,7 @@ export interface Habit {
 export type HabitState = 'done' | 'rest' | 'failed'
 
 export interface DayRecords {
-  [habitId: number]: HabitState
+  [habitId: string]: HabitState
 }
 
 export interface MonthSummary {
@@ -19,7 +19,7 @@ export interface MonthSummary {
 }
 
 export interface HabitMonthStats {
-  [habitId: number]: number
+  [habitId: string]: number
 }
 
 export interface Task {

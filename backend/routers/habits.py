@@ -28,7 +28,7 @@ def create_habit(body: HabitCreate, user_id: str = Depends(get_user_id)):
 
 
 @router.patch("/{habit_id}")
-def update_habit(habit_id: int, body: HabitUpdate, user_id: str = Depends(get_user_id)):
+def update_habit(habit_id: str, body: HabitUpdate, user_id: str = Depends(get_user_id)):
     db = get_db()
     data = body.model_dump(exclude_none=True)
     res = db.table("habits").update(data).eq("id", habit_id).eq("user_id", user_id).execute()
@@ -36,13 +36,13 @@ def update_habit(habit_id: int, body: HabitUpdate, user_id: str = Depends(get_us
 
 
 @router.delete("/{habit_id}", status_code=204)
-def delete_habit(habit_id: int, user_id: str = Depends(get_user_id)):
+def delete_habit(habit_id: str, user_id: str = Depends(get_user_id)):
     db = get_db()
     db.table("habits").update({"active": False}).eq("id", habit_id).eq("user_id", user_id).execute()
 
 
 @router.put("/reorder")
-def reorder_habits(ordered_ids: list[int], user_id: str = Depends(get_user_id)):
+def reorder_habits(ordered_ids: list[str], user_id: str = Depends(get_user_id)):
     db = get_db()
     for i, hid in enumerate(ordered_ids):
         db.table("habits").update({"ord": i}).eq("id", hid).eq("user_id", user_id).execute()
