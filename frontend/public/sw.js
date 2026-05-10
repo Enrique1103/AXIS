@@ -1,8 +1,6 @@
-const CACHE = "fenix-v1"
-const SHELL = ["/", "/manifest.json", "/fenix-icon.png"]
+const CACHE = "fenix-v2"
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)))
   self.skipWaiting()
 })
 
@@ -15,16 +13,32 @@ self.addEventListener("activate", (e) => {
   self.clients.claim()
 })
 
+// Solo cachear assets estáticos — NUNCA navigation requests (HTML)
+// Esto evita que se cacheen redirecciones de auth y congelen la app
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return
+
+  // Dejar pasar navegación siempre al network para que el proxy de auth funcione
+  if (e.request.mode === "navigate") return
+
+  const url = new URL(e.request.url)
+  const isStatic =
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/_next/image/") ||
+    url.pathname === "/fenix-icon.png" ||
+    url.pathname === "/manifest.json"
+
+  if (!isStatic) return
+
   e.respondWith(
-    fetch(e.request)
-      .then((res) => {
+    caches.match(e.request).then((cached) => {
+      if (cached) return cached
+      return fetch(e.request).then((res) => {
         const clone = res.clone()
         caches.open(CACHE).then((c) => c.put(e.request, clone))
         return res
       })
-      .catch(() => caches.match(e.request))
+    })
   )
 })
 
@@ -54,8 +68,7 @@ self.addEventListener("notificationclick", (e) => {
   )
 })
 
-// ── Client-side scheduling (setTimeout) ───────────────────────────────────────
-// The page sends SCHEDULE_REMINDERS on load; SW sets timers for today.
+// ── Client-side scheduling ────────────────────────────────────────────────────
 
 const _timers = []
 
@@ -64,7 +77,7 @@ function scheduleReminders(reminders) {
   _timers.length = 0
 
   const now = new Date()
-  const todayDay = now.getDay() // 0=Sun … 6=Sat
+  const todayDay = now.getDay()
 
   reminders.forEach((r) => {
     if (!r.active || !r.days.includes(todayDay)) return
