@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers import habits, records, tasks
 
@@ -19,3 +19,8 @@ app.include_router(tasks.router)
 @app.get("/")
 def root():
     return {"status": "ok"}
+
+
+@app.get("/debug-headers")
+async def debug_headers(request: Request):
+    return dict(request.headers)

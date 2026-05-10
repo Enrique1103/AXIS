@@ -1,11 +1,15 @@
 import os
-from fastapi import HTTPException, Header
+from fastapi import HTTPException, Request
 from jose import jwt, JWTError
 
 JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
 
 
-def get_user_id(authorization: str = Header(...)) -> str:
+def get_user_id(request: Request) -> str:
+    authorization = request.headers.get("authorization") or request.headers.get("Authorization")
+    print(f"[AUTH] authorization present: {bool(authorization)}", flush=True)
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
     if not JWT_SECRET:
         raise HTTPException(status_code=500, detail="SUPABASE_JWT_SECRET not configured")
     try:
