@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const [loading, setLoading]   = useState(true)
   const [newName, setNewName]   = useState("")
   const [adding, setAdding]     = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [confirm, setConfirm]   = useState<null | "month" | "all">(null)
   const [apiError, setApiError] = useState("")
@@ -50,13 +50,13 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleRename(id: number) {
+  async function handleRename(id: string) {
     if (!editName.trim()) return
     await updateHabit(id, { name: editName.trim() })
     setEditingId(null); load()
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: string) {
     await deleteHabit(id); load()
   }
 

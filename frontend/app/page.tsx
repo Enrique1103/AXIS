@@ -8,7 +8,7 @@ import { MONTHS, DAYS_SHORT, daysInMonth, firstWeekdayOffset, toISODate, streak 
 import { HabitCell } from "@/components/habit-cell"
 import { MonthlyEKGChart } from "@/components/monthly-ekg-chart"
 
-type RecordMatrix = Record<string, Record<number, string>>
+type RecordMatrix = Record<string, Record<string, string>>
 
 function getWeeks(year: number, month: number): (number | null)[][] {
   const days = daysInMonth(year, month)
@@ -38,7 +38,7 @@ function WeeklyView({
   year: number
   month: number
   todayStr: string
-  onCycle: (date: string, habitId: number) => void
+  onCycle: (date: string, habitId: string) => void
 }) {
   const currentWeekIdx = weeks.findIndex(week =>
     week.some(d => d && dateStr(year, month, d) === todayStr)
@@ -132,7 +132,7 @@ function MonthlyView({
   year: number
   month: number
   todayStr: string
-  onCycle: (date: string, habitId: number) => void
+  onCycle: (date: string, habitId: string) => void
 }) {
   const days = daysInMonth(year, month)
   const allDays = Array.from({ length: days }, (_, i) => i + 1)
@@ -267,7 +267,7 @@ export default function HabitTrackerPage() {
     return undefined
   }
 
-  async function handleCycle(ds: string, habitId: number) {
+  async function handleCycle(ds: string, habitId: string) {
     const current = matrix[ds]?.[habitId]
     const next = nextState(current)
     setMatrix(prev => {

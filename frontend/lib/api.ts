@@ -32,10 +32,10 @@ export const getHabits = (): Promise<Habit[]> =>
 export const createHabit = (name: string): Promise<Habit> =>
   req("/habits", { method: "POST", body: JSON.stringify({ name }) })
 
-export const updateHabit = (id: number, data: { name?: string; active?: boolean }): Promise<Habit> =>
+export const updateHabit = (id: string, data: { name?: string; active?: boolean }): Promise<Habit> =>
   req(`/habits/${id}`, { method: "PATCH", body: JSON.stringify(data) })
 
-export const deleteHabit = (id: number): Promise<void> =>
+export const deleteHabit = (id: string): Promise<void> =>
   req(`/habits/${id}`, { method: "DELETE" })
 
 // ── Records ───────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ export const getWeekdayAvg = (months = 3): Promise<Record<string, number>> =>
 export const getMonthAll = (year: number, month: number): Promise<{ date: string; habit_id: number; state: string }[]> =>
   req(`/records/month-all/${year}/${month}`)
 
-export const setRecord = (date: string, habitId: number, state: string | null): Promise<{ state: string | null }> =>
+export const setRecord = (date: string, habitId: string, state: string | null): Promise<{ state: string | null }> =>
   req("/records/set", {
     method: "POST",
     body: JSON.stringify({ date, habit_id: habitId, state }),
