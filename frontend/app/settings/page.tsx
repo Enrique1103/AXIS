@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Pencil, Trash2, Check, X, Bell, MessageSquareQuote, Clock } from "lucide-react"
+import { Plus, Pencil, Trash2, Check, X, Bell, MessageSquareQuote, Clock, LogOut } from "lucide-react"
 import { getHabits, createHabit, updateHabit, deleteHabit, resetMonth, resetAll } from "@/lib/api"
 import { Habit } from "@/lib/types"
 import { getSettings, saveSettings, QuoteSettings } from "@/lib/quote-utils"
+import { supabase } from "@/lib/supabase"
 
 export default function SettingsPage() {
   const [habits, setHabits]     = useState<Habit[]>([])
@@ -218,6 +219,22 @@ export default function SettingsPage() {
               {saved ? "Guardado ✓" : "Guardar configuración"}
             </button>
           </div>
+        </div>
+
+        {/* ── Cuenta ── */}
+        <div className="gc overflow-hidden">
+          <p className="text-xs uppercase tracking-wider text-zinc-400 px-4 py-3 border-b border-slate-700/40">
+            Cuenta
+          </p>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              window.location.href = "/login"
+            }}
+            className="w-full px-4 py-3.5 text-sm text-left text-zinc-300 hover:bg-zinc-800/50 transition-colors flex items-center gap-3">
+            <LogOut size={15} className="text-zinc-500"/>
+            Cerrar sesión
+          </button>
         </div>
 
         {/* ── Datos ── */}
