@@ -47,6 +47,7 @@ function MoodCell({ level, isPast, onCycle }: { level?: number; isPast: boolean;
   const color = level ? MOOD_COLORS[level - 1] : undefined
   return (
     <button
+      type="button"
       onClick={onCycle}
       className="w-9 h-6 flex items-center justify-center rounded transition-colors"
       style={{ backgroundColor: color ? color + "30" : undefined }}
