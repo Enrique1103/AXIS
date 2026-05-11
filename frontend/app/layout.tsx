@@ -21,8 +21,11 @@ export const metadata: Metadata = {
     title: "FÉNIX",
   },
   icons: {
-    icon: "/fenix-icon.png",
-    apple: "/fenix-icon.png",
+    icon: [
+      { url: "/fenix-icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/fenix-icon.png",     sizes: "468x446", type: "image/png" },
+    ],
+    apple: "/fenix-icon-512.png",
   },
 }
 
