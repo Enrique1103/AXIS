@@ -30,12 +30,55 @@ function dateStr(year: number, month: number, day: number) {
 
 // ── Mood ─────────────────────────────────────────────────────────────────────
 
-function MoodCell({ level, isPast, onCycle }: { level?: number; isPast: boolean; onCycle: () => void }) {
+const MOOD_EMOJIS = ["😴","😵","😞","😔","😐","🙂","😊","😄","🤩","🥳"]
+
+function MoodPicker({ x, y, onSelect, onClose }: {
+  x: number; y: number
+  onSelect: (level: number) => void
+  onClose: () => void
+}) {
+  const W = 196
+  const left = Math.min(Math.max(x - W / 2, 8), (typeof window !== "undefined" ? window.innerWidth : 400) - W - 8)
+  const showBelow = y < 110
+  const top = showBelow ? y + 30 : y - 96
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50" onClick={onClose}/>
+      <div
+        className="fixed z-50 bg-zinc-800 border border-zinc-700/60 rounded-2xl p-2 shadow-2xl"
+        style={{ left, top, width: W }}
+      >
+        <div className="grid grid-cols-5 gap-1">
+          {MOOD_EMOJIS.map((emoji, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onSelect(i + 1)}
+              className="h-8 flex items-center justify-center rounded-xl hover:bg-zinc-700 transition-colors text-lg"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelect(0)}
+          className="w-full mt-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors py-0.5"
+        >
+          Borrar
+        </button>
+      </div>
+    </>
+  )
+}
+
+function MoodCell({ level, isPast, onOpen }: { level?: number; isPast: boolean; onOpen: (e: React.MouseEvent) => void }) {
   if (!isPast) return <div className="w-9 h-6" />
   return (
     <button
       type="button"
-      onClick={onCycle}
+      onClick={onOpen}
       className="w-9 h-6 flex items-center justify-center rounded hover:bg-zinc-800 transition-colors"
     >
       {level ? (
@@ -60,7 +103,7 @@ function WeeklyView({
   month: number
   todayStr: string
   onCycle: (date: string, habitId: string) => void
-  onMoodCycle: (date: string) => void
+  onMoodOpen: (date: string, e: React.MouseEvent) => void
 }) {
   const currentWeekIdx = weeks.findIndex(week =>
     week.some(d => d && dateStr(year, month, d) === todayStr)
@@ -152,7 +195,7 @@ function WeeklyView({
                       <MoodCell
                         level={moodMap[ds]}
                         isPast={isPast}
-                        onCycle={() => onMoodCycle(ds)}
+                        onOpen={(e) => onMoodOpen(ds, e)}
                       />
                     </div>
                   )
@@ -178,7 +221,7 @@ function MonthlyView({
   month: number
   todayStr: string
   onCycle: (date: string, habitId: string) => void
-  onMoodCycle: (date: string) => void
+  onMoodOpen: (date: string, e: React.MouseEvent) => void
 }) {
   const days = daysInMonth(year, month)
   const allDays = Array.from({ length: days }, (_, i) => i + 1)
@@ -263,7 +306,7 @@ function MonthlyView({
                     <MoodCell
                       level={moodMap[ds]}
                       isPast={isPast}
-                      onCycle={() => onMoodCycle(ds)}
+                      onOpen={(e) => onMoodOpen(ds, e)}
                     />
                   </div>
                 </td>
@@ -291,6 +334,7 @@ export default function HabitTrackerPage() {
   const [prevMonthDays, setPrevMonthDays] = useState(0)
   const [view, setView] = useState<"weekly" | "monthly">("weekly")
   const [moodMap, setMoodMap] = useState<Record<string, number>>({})
+  const [picker, setPicker] = useState<{ date: string; x: number; y: number } | null>(null)
 
   // Auto-detecta vista según ancho. Se actualiza al redimensionar.
   useEffect(() => {
@@ -354,16 +398,22 @@ export default function HabitTrackerPage() {
     try { await setRecord(ds, habitId, next ?? null) } catch { load() }
   }
 
-  async function handleMoodCycle(ds: string) {
-    const current = moodMap[ds]
-    const next = current === undefined ? 1 : current >= 10 ? undefined : current + 1
+  function openMoodPicker(date: string, e: React.MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPicker({ date, x: rect.left + rect.width / 2, y: rect.top })
+  }
+
+  async function handleMoodSelect(level: number) {
+    if (!picker) return
+    const { date } = picker
+    setPicker(null)
     setMoodMap(prev => {
       const updated = { ...prev }
-      if (next === undefined) delete updated[ds]
-      else updated[ds] = next
+      if (level === 0) delete updated[date]
+      else updated[date] = level
       return updated
     })
-    try { await setMood(ds, next ?? 0) } catch { /* revert on error */ load() }
+    try { await setMood(date, level) } catch { load() }
   }
 
   // Today's progress
@@ -482,7 +532,7 @@ export default function HabitTrackerPage() {
           month={month}
           todayStr={today}
           onCycle={handleCycle}
-          onMoodCycle={handleMoodCycle}
+          onMoodOpen={openMoodPicker}
         />
         </div>
       ) : (
@@ -495,12 +545,21 @@ export default function HabitTrackerPage() {
           month={month}
           todayStr={today}
           onCycle={handleCycle}
-          onMoodCycle={handleMoodCycle}
+          onMoodOpen={openMoodPicker}
         />
         </div>
       )}
 
       <div className="pb-10"/>
+
+      {picker && (
+        <MoodPicker
+          x={picker.x}
+          y={picker.y}
+          onSelect={handleMoodSelect}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </div>
   )
 }
