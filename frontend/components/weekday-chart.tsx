@@ -1,5 +1,7 @@
 "use client"
 
+import { memo } from "react"
+
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
 function barColor(pct: number) {
@@ -8,7 +10,7 @@ function barColor(pct: number) {
   return "#ef4444"
 }
 
-export function WeekdayChart({ data }: { data: Record<string, number> }) {
+export const WeekdayChart = memo(function WeekdayChart({ data }: { data: Record<string, number> }) {
   const values = DAYS.map((_, i) => data[String(i)] ?? 0)
   const max = Math.max(...values, 1)
 
@@ -29,4 +31,4 @@ export function WeekdayChart({ data }: { data: Record<string, number> }) {
       ))}
     </div>
   )
-}
+})

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 
 type RecordMatrix = Record<string, Record<number, string>>
 
@@ -20,7 +20,7 @@ const CHART_H   = 150  // px, SVG chart area
 const X_LABEL_H = 18   // px, bottom day numbers
 const Y_LABEL_W = 30   // px, left % labels
 
-export function MonthlyEKGChart({ matrix, habitCount, year, month, todayStr }: Props) {
+export const MonthlyEKGChart = memo(function MonthlyEKGChart({ matrix, habitCount, year, month, todayStr }: Props) {
   const days = new Date(year, month, 0).getDate()
 
   // pct per day — ALL days of month (0 if no data)
@@ -140,4 +140,4 @@ export function MonthlyEKGChart({ matrix, habitCount, year, month, todayStr }: P
       </div>
     </div>
   )
-}
+})

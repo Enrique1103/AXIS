@@ -1,5 +1,7 @@
 "use client"
 
+import { memo } from "react"
+
 const COL = 44          // px por semana
 const H   = 180
 const PAD_TOP = 14
@@ -14,7 +16,7 @@ function yPos(pct: number) {
   return PAD_TOP + PLOT_H * (1 - pct / 100)
 }
 
-export function TrendChart({ data, showAllLabels = false }: { data: Point[]; showAllLabels?: boolean }) {
+export const TrendChart = memo(function TrendChart({ data, showAllLabels = false }: { data: Point[]; showAllLabels?: boolean }) {
   if (!data.length) return (
     <p className="text-xs text-zinc-600 text-center py-8">Sin datos aún</p>
   )
@@ -110,4 +112,4 @@ export function TrendChart({ data, showAllLabels = false }: { data: Point[]; sho
       </svg>
     </div>
   )
-}
+})

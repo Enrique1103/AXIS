@@ -4,8 +4,13 @@ import { useState, useEffect } from "react"
 import { Plus, Trash2, Check, CalendarDays, X, ChevronRight, Lock, GitBranch, List, Network } from "lucide-react"
 import { getTasks, createTask, updateTask, deleteTask, addTaskDep, removeTaskDep } from "@/lib/api"
 import { Task } from "@/lib/types"
-import { SankeyChart } from "@/components/sankey-chart"
-import { TaskGraph } from "@/components/task-graph"
+import dynamic from "next/dynamic"
+
+const SankeyChart = dynamic(() => import("@/components/sankey-chart").then(m => ({ default: m.SankeyChart })), { ssr: false })
+const TaskGraph   = dynamic(() => import("@/components/task-graph").then(m => ({ default: m.TaskGraph })),   {
+  ssr: false,
+  loading: () => <div className="h-64 bg-zinc-900 rounded-2xl animate-pulse"/>,
+})
 
 type TabKey = "daily" | "weekly" | "monthly"
 
