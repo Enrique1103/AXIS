@@ -6,6 +6,7 @@ import { getHabits, getMonthAll, setRecord, getMonthSummary, getMonthMood, setMo
 import { Habit } from "@/lib/types"
 import { MONTHS, DAYS_SHORT, daysInMonth, firstWeekdayOffset, toISODate, streak } from "@/lib/utils"
 import { HabitCell } from "@/components/habit-cell"
+import { MoodEmoji } from "@/components/mood-emoji"
 import { MonthlyEKGChart } from "@/components/monthly-ekg-chart"
 
 type RecordMatrix = Record<string, Record<string, string>>
@@ -29,33 +30,16 @@ function dateStr(year: number, month: number, day: number) {
 
 // ── Mood ─────────────────────────────────────────────────────────────────────
 
-const MOOD_COLORS = [
-  "#27272a", // 1
-  "#3f3f46", // 2
-  "#71717a", // 3
-  "#a3a3a3", // 4
-  "#ca8a04", // 5
-  "#eab308", // 6
-  "#f97316", // 7
-  "#ea580c", // 8
-  "#dc2626", // 9
-  "#fb923c", // 10 FÉNIX
-]
-
 function MoodCell({ level, isPast, onCycle }: { level?: number; isPast: boolean; onCycle: () => void }) {
   if (!isPast) return <div className="w-9 h-6" />
-  const color = level ? MOOD_COLORS[level - 1] : undefined
   return (
     <button
       type="button"
       onClick={onCycle}
-      className="w-9 h-6 flex items-center justify-center rounded transition-colors"
-      style={{ backgroundColor: color ? color + "30" : undefined }}
+      className="w-9 h-6 flex items-center justify-center rounded hover:bg-zinc-800 transition-colors"
     >
       {level ? (
-        <span className="text-[11px] font-bold tabular-nums" style={{ color }}>
-          {level}
-        </span>
+        <MoodEmoji level={level}/>
       ) : (
         <span className="text-[10px] text-zinc-700">·</span>
       )}
