@@ -1,4 +1,4 @@
-const CACHE = "fenix-v2"
+const CACHE = "fenix-v3"
 
 self.addEventListener("install", (e) => {
   self.skipWaiting()
@@ -13,20 +13,21 @@ self.addEventListener("activate", (e) => {
   self.clients.claim()
 })
 
-// Solo cachear assets estáticos — NUNCA navigation requests (HTML)
-// Esto evita que se cacheen redirecciones de auth y congelen la app
+// Solo cachear assets estáticos — NUNCA navigation ni manifest (permite actualizaciones de PWA)
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return
-
-  // Dejar pasar navegación siempre al network para que el proxy de auth funcione
   if (e.request.mode === "navigate") return
 
   const url = new URL(e.request.url)
+
+  // El manifest NUNCA se cachea — Chrome necesita leerlo fresco para detectar cambios de ícono
+  if (url.pathname === "/manifest.json") return
+
   const isStatic =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/_next/image/") ||
     url.pathname === "/fenix-icon.png" ||
-    url.pathname === "/manifest.json"
+    url.pathname === "/fenix-icon-512.png"
 
   if (!isStatic) return
 
@@ -49,8 +50,8 @@ self.addEventListener("push", (e) => {
   e.waitUntil(
     self.registration.showNotification(data.title ?? "FÉNIX", {
       body: data.body ?? "",
-      icon: "/fenix-icon.png",
-      badge: "/fenix-icon.png",
+      icon: "/fenix-icon-512.png",
+      badge: "/fenix-icon-512.png",
       tag: data.tag ?? "fenix-reminder",
       renotify: true,
     })
@@ -89,8 +90,8 @@ function scheduleReminders(reminders) {
     const tid = setTimeout(() => {
       self.registration.showNotification("FÉNIX", {
         body: r.label,
-        icon: "/fenix-icon.png",
-        badge: "/fenix-icon.png",
+        icon: "/fenix-icon-512.png",
+        badge: "/fenix-icon-512.png",
         tag: `reminder-${r.id}`,
         renotify: true,
       })
