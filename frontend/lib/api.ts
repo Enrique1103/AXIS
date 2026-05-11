@@ -125,6 +125,14 @@ export const addTaskDep = (taskId: number, depId: number): Promise<void> =>
 export const removeTaskDep = (taskId: number, depId: number): Promise<void> =>
   req(`/tasks/${taskId}/deps/${depId}`, { method: "DELETE" })
 
+// ── Mood ──────────────────────────────────────────────────────────────────────
+
+export const getMonthMood = (year: number, month: number): Promise<Record<string, number>> =>
+  req(`/mood/${year}/${month}`)
+
+export const setMood = (date: string, level: number): Promise<{ level: number }> =>
+  req("/mood/set", { method: "POST", body: JSON.stringify({ date, level }) })
+
 // ── Reminders ─────────────────────────────────────────────────────────────────
 
 export const getReminders = (): Promise<Reminder[]> =>

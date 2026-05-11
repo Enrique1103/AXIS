@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from routers import habits, records, tasks, goals, reminders
+from routers import habits, records, tasks, goals, reminders, mood
 
 app = FastAPI(title="Habit Tracker API")
 
@@ -31,6 +31,7 @@ app.include_router(records.router)
 app.include_router(tasks.router)
 app.include_router(goals.router)
 app.include_router(reminders.router)
+app.include_router(mood.router)
 
 
 @app.get("/")

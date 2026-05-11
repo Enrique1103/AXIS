@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { ChevronLeft, ChevronRight, Flame, TrendingUp, TrendingDown } from "lucide-react"
-import { getHabits, getMonthAll, setRecord, getMonthSummary } from "@/lib/api"
+import { getHabits, getMonthAll, setRecord, getMonthSummary, getMonthMood, setMood } from "@/lib/api"
 import { Habit } from "@/lib/types"
 import { MONTHS, DAYS_SHORT, daysInMonth, firstWeekdayOffset, toISODate, streak } from "@/lib/utils"
 import { HabitCell } from "@/components/habit-cell"
@@ -27,18 +27,55 @@ function dateStr(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 }
 
+// ── Mood ─────────────────────────────────────────────────────────────────────
+
+const MOOD_COLORS = [
+  "#27272a", // 1
+  "#3f3f46", // 2
+  "#71717a", // 3
+  "#a3a3a3", // 4
+  "#ca8a04", // 5
+  "#eab308", // 6
+  "#f97316", // 7
+  "#ea580c", // 8
+  "#dc2626", // 9
+  "#fb923c", // 10 FÉNIX
+]
+
+function MoodCell({ level, isPast, onCycle }: { level?: number; isPast: boolean; onCycle: () => void }) {
+  if (!isPast) return <div className="w-9 h-6" />
+  const color = level ? MOOD_COLORS[level - 1] : undefined
+  return (
+    <button
+      onClick={onCycle}
+      className="w-9 h-6 flex items-center justify-center rounded transition-colors"
+      style={{ backgroundColor: color ? color + "30" : undefined }}
+    >
+      {level ? (
+        <span className="text-[11px] font-bold tabular-nums" style={{ color }}>
+          {level}
+        </span>
+      ) : (
+        <span className="text-[10px] text-zinc-700">·</span>
+      )}
+    </button>
+  )
+}
+
 // ── Weekly view ──────────────────────────────────────────────────────────────
 
 function WeeklyView({
-  weeks, habits, matrix, year, month, todayStr, onCycle,
+  weeks, habits, matrix, moodMap, year, month, todayStr, onCycle, onMoodCycle,
 }: {
   weeks: (number | null)[][]
   habits: Habit[]
   matrix: RecordMatrix
+  moodMap: Record<string, number>
   year: number
   month: number
   todayStr: string
   onCycle: (date: string, habitId: string) => void
+  onMoodCycle: (date: string) => void
 }) {
   const currentWeekIdx = weeks.findIndex(week =>
     week.some(d => d && dateStr(year, month, d) === todayStr)
@@ -114,6 +151,28 @@ function WeeklyView({
                   })}
                 </div>
               ))}
+
+              {/* Mood row */}
+              <div
+                className="grid items-center gap-0 border-t border-zinc-800/60 pt-1 mt-1"
+                style={{ gridTemplateColumns: "minmax(90px, 1fr) repeat(7, minmax(0, 1fr))" }}
+              >
+                <span className="text-[10px] text-zinc-500 pr-1 py-1 uppercase tracking-wider">Ánimo</span>
+                {week.map((day, i) => {
+                  if (!day) return <div key={i} className="flex justify-center"><div className="w-9 h-6" /></div>
+                  const ds = dateStr(year, month, day)
+                  const isPast = ds <= todayStr
+                  return (
+                    <div key={i} className="flex justify-center py-0.5">
+                      <MoodCell
+                        level={moodMap[ds]}
+                        isPast={isPast}
+                        onCycle={() => onMoodCycle(ds)}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )
@@ -125,14 +184,16 @@ function WeeklyView({
 // ── Monthly view ─────────────────────────────────────────────────────────────
 
 function MonthlyView({
-  habits, matrix, year, month, todayStr, onCycle,
+  habits, matrix, moodMap, year, month, todayStr, onCycle, onMoodCycle,
 }: {
   habits: Habit[]
   matrix: RecordMatrix
+  moodMap: Record<string, number>
   year: number
   month: number
   todayStr: string
   onCycle: (date: string, habitId: string) => void
+  onMoodCycle: (date: string) => void
 }) {
   const days = daysInMonth(year, month)
   const allDays = Array.from({ length: days }, (_, i) => i + 1)
@@ -198,6 +259,32 @@ function MonthlyView({
               })}
             </tr>
           ))}
+          {/* Mood row */}
+          <tr className="border-t border-zinc-700/50">
+            <td className="sticky left-0 z-10 bg-[var(--sticky-bg)] px-3 py-1">
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">Ánimo</span>
+            </td>
+            {allDays.map(day => {
+              const ds = dateStr(year, month, day)
+              const isPast = ds <= todayStr
+              const dow = new Date(year, month - 1, day).getDay()
+              const isMon = dow === 1 && day > 1
+              return (
+                <td
+                  key={day}
+                  className={`py-1 ${isMon ? "border-l border-l-zinc-700" : ""}`}
+                >
+                  <div className="flex justify-center">
+                    <MoodCell
+                      level={moodMap[ds]}
+                      isPast={isPast}
+                      onCycle={() => onMoodCycle(ds)}
+                    />
+                  </div>
+                </td>
+              )
+            })}
+          </tr>
         </tbody>
       </table>
     </div>
@@ -218,6 +305,7 @@ export default function HabitTrackerPage() {
   const [prevMonthDone, setPrevMonthDone] = useState(0)
   const [prevMonthDays, setPrevMonthDays] = useState(0)
   const [view, setView] = useState<"weekly" | "monthly">("weekly")
+  const [moodMap, setMoodMap] = useState<Record<string, number>>({})
 
   // Auto-detecta vista según ancho. Se actualiza al redimensionar.
   useEffect(() => {
@@ -234,10 +322,11 @@ export default function HabitTrackerPage() {
     setLoading(true)
     const prevM = month === 1 ? 12 : month - 1
     const prevY = month === 1 ? year - 1 : year
-    const [h, records, prevSummary] = await Promise.all([
+    const [h, records, prevSummary, moodData] = await Promise.all([
       getHabits(),
       getMonthAll(year, month),
       getMonthSummary(prevY, prevM),
+      getMonthMood(year, month),
     ])
     setHabits(h)
     const m: RecordMatrix = {}
@@ -246,6 +335,7 @@ export default function HabitTrackerPage() {
       m[r.date][r.habit_id] = r.state
     }
     setMatrix(m)
+    setMoodMap(moodData)
     setPrevMonthDone(Object.values(prevSummary).reduce((a, b) => a + b, 0))
     setPrevMonthDays(daysInMonth(prevY, prevM))
     setLoading(false)
@@ -277,6 +367,18 @@ export default function HabitTrackerPage() {
       return updated
     })
     try { await setRecord(ds, habitId, next ?? null) } catch { load() }
+  }
+
+  async function handleMoodCycle(ds: string) {
+    const current = moodMap[ds]
+    const next = current === undefined ? 1 : current >= 10 ? undefined : current + 1
+    setMoodMap(prev => {
+      const updated = { ...prev }
+      if (next === undefined) delete updated[ds]
+      else updated[ds] = next
+      return updated
+    })
+    try { await setMood(ds, next ?? 0) } catch { /* revert on error */ load() }
   }
 
   // Today's progress
@@ -390,10 +492,12 @@ export default function HabitTrackerPage() {
           weeks={weeks}
           habits={habits}
           matrix={matrix}
+          moodMap={moodMap}
           year={year}
           month={month}
           todayStr={today}
           onCycle={handleCycle}
+          onMoodCycle={handleMoodCycle}
         />
         </div>
       ) : (
@@ -401,10 +505,12 @@ export default function HabitTrackerPage() {
         <MonthlyView
           habits={habits}
           matrix={matrix}
+          moodMap={moodMap}
           year={year}
           month={month}
           todayStr={today}
           onCycle={handleCycle}
+          onMoodCycle={handleMoodCycle}
         />
         </div>
       )}
