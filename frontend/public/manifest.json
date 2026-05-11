@@ -7,7 +7,7 @@
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "icons": [
-    { "src": "/fenix-icon-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/fenix-icon.png",         "sizes": "468x446", "type": "image/png", "purpose": "maskable" }
+    { "src": "/fenix-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/fenix-icon.png",     "sizes": "468x446", "type": "image/png", "purpose": "maskable" }
   ]
 }
