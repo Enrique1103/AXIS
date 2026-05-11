@@ -32,30 +32,23 @@ function dateStr(year: number, month: number, day: number) {
 
 const MOOD_EMOJIS = ["😴","😵","😞","😔","😐","🙂","😊","😄","🤩","🥳"]
 
-function MoodPicker({ x, y, onSelect, onClose }: {
-  x: number; y: number
+function MoodPicker({ onSelect, onClose }: {
   onSelect: (level: number) => void
   onClose: () => void
 }) {
-  const W = 196
-  const left = Math.min(Math.max(x - W / 2, 8), (typeof window !== "undefined" ? window.innerWidth : 400) - W - 8)
-  const showBelow = y < 110
-  const top = showBelow ? y + 30 : y - 96
-
   return (
     <>
-      <div className="fixed inset-0 z-50" onClick={onClose}/>
-      <div
-        className="fixed z-50 bg-zinc-800 border border-zinc-700/60 rounded-2xl p-2 shadow-2xl"
-        style={{ left, top, width: W }}
-      >
-        <div className="grid grid-cols-5 gap-1">
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose}/>
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-900 border-t border-zinc-700/60 rounded-t-2xl px-4 pt-3 pb-8">
+        <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-3"/>
+        <p className="text-[10px] text-zinc-500 text-center uppercase tracking-widest mb-3">Ánimo del día</p>
+        <div className="grid grid-cols-5 gap-2 mb-3">
           {MOOD_EMOJIS.map((emoji, i) => (
             <button
               key={i}
               type="button"
               onClick={() => onSelect(i + 1)}
-              className="h-8 flex items-center justify-center rounded-xl hover:bg-zinc-700 transition-colors text-lg"
+              className="h-12 flex items-center justify-center rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 transition-all text-2xl"
             >
               {emoji}
             </button>
@@ -64,7 +57,7 @@ function MoodPicker({ x, y, onSelect, onClose }: {
         <button
           type="button"
           onClick={() => onSelect(0)}
-          className="w-full mt-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors py-0.5"
+          className="w-full py-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
         >
           Borrar
         </button>
@@ -78,14 +71,10 @@ function MoodCell({ level, isPast, onOpen }: { level?: number; isPast: boolean; 
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={(e) => { e.stopPropagation(); onOpen(e) }}
       className="w-9 h-6 flex items-center justify-center rounded hover:bg-zinc-800 transition-colors"
     >
-      {level ? (
-        <MoodEmoji level={level}/>
-      ) : (
-        <span className="text-[10px] text-zinc-700">·</span>
-      )}
+      {level ? <MoodEmoji level={level}/> : <span className="text-[10px] text-zinc-700">·</span>}
     </button>
   )
 }
@@ -334,7 +323,7 @@ export default function HabitTrackerPage() {
   const [prevMonthDays, setPrevMonthDays] = useState(0)
   const [view, setView] = useState<"weekly" | "monthly">("weekly")
   const [moodMap, setMoodMap] = useState<Record<string, number>>({})
-  const [picker, setPicker] = useState<{ date: string; x: number; y: number } | null>(null)
+  const [picker, setPicker] = useState<string | null>(null)
 
   // Auto-detecta vista según ancho. Se actualiza al redimensionar.
   useEffect(() => {
@@ -399,13 +388,13 @@ export default function HabitTrackerPage() {
   }
 
   function openMoodPicker(date: string, e: React.MouseEvent) {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setPicker({ date, x: rect.left + rect.width / 2, y: rect.top })
+    e.stopPropagation()
+    setPicker(date)
   }
 
   async function handleMoodSelect(level: number) {
     if (!picker) return
-    const { date } = picker
+    const date = picker
     setPicker(null)
     setMoodMap(prev => {
       const updated = { ...prev }
@@ -554,8 +543,6 @@ export default function HabitTrackerPage() {
 
       {picker && (
         <MoodPicker
-          x={picker.x}
-          y={picker.y}
           onSelect={handleMoodSelect}
           onClose={() => setPicker(null)}
         />
