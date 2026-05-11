@@ -82,7 +82,7 @@ function MoodCell({ level, isPast, onOpen }: { level?: number; isPast: boolean; 
 // ── Weekly view ──────────────────────────────────────────────────────────────
 
 function WeeklyView({
-  weeks, habits, matrix, moodMap, year, month, todayStr, onCycle, onMoodCycle,
+  weeks, habits, matrix, moodMap, year, month, todayStr, onCycle, onMoodOpen,
 }: {
   weeks: (number | null)[][]
   habits: Habit[]
