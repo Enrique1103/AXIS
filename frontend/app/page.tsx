@@ -326,7 +326,7 @@ export default function HabitTrackerPage() {
       getHabits(),
       getMonthAll(year, month),
       getMonthSummary(prevY, prevM),
-      getMonthMood(year, month),
+      getMonthMood(year, month).catch(() => ({} as Record<string, number>)),
     ])
     setHabits(h)
     const m: RecordMatrix = {}
