@@ -201,7 +201,7 @@ function WeeklyView({
 // ── Monthly view ─────────────────────────────────────────────────────────────
 
 function MonthlyView({
-  habits, matrix, moodMap, year, month, todayStr, onCycle, onMoodCycle,
+  habits, matrix, moodMap, year, month, todayStr, onCycle, onMoodOpen,
 }: {
   habits: Habit[]
   matrix: RecordMatrix
